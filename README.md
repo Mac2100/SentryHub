@@ -32,10 +32,12 @@ and exports a range to MP4 with the HUD burned in.
   is permanent.
 - **Clip library** — the app opens straight into the gallery: clips loaded, GPS-tagged, camera
   streams, and total storage at a glance. Filter chips for **All / Saved / Sentry** plus
-  trigger chips derived from `event.json` (**Motion / Impact / Honk / Manual Save**, offered only
-  when clips of that kind exist — the folder chip says *where* a clip sits, the trigger chip says
-  *why* the car kept it, and they don't always agree: tap save during a Sentry event and the clip
-  stays in `SentryClips`), a date filter with presets and a custom range picker, search,
+  an **Event** chip and the trigger chips derived from `event.json`
+  (**Motion / Impact / Honk / Manual Save**, offered only when clips of that kind exist). The folder
+  chip says *where* a clip sits, the event chips say *why* the car kept it, and they don't always
+  agree: tap save during a Sentry event and the clip stays in `SentryClips`. **Event** is the
+  catch-all — it takes everything the car flagged, and it's the only way to reach clips whose
+  `reason` string SentryHub can't name., a date filter with presets and a custom range picker, search,
   sorting by date/category/length/size/name, three card densities, and a **Grid / List / Map**
   switch — the grid for recognising footage by sight, the list for scanning hundreds of clips by
   their facts in aligned columns, the map for pinning every GPS-tagged clip on real tiles. The gallery is sectioned — by day, event kind, or folder —

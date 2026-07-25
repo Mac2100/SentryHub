@@ -416,6 +416,15 @@ struct Clip: Identifiable, Hashable {
         ClipTrigger(reason: event?.reason)
     }
 
+    /// True when the car flagged this clip for a reason of any kind.
+    ///
+    /// Wider than `trigger` on purpose: Tesla has shipped `reason` strings we
+    /// don't classify, and those clips draw a badge on their card with no
+    /// specific pill to reach them by.
+    var isFlagged: Bool {
+        trigger != nil || event?.reasonLabel != nil
+    }
+
     /// Where the playable timeline actually begins.
     ///
     /// A Sentry folder is *named* for the moment of the event, but the footage

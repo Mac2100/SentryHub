@@ -114,6 +114,56 @@ struct ClipGroup: Identifiable {
     let clips: [Clip]
 }
 
+/// One chip in the library's filter row.
+///
+/// The row is one-of-N: picking a chip replaces whatever was picked before
+/// rather than stacking with it, so it lives as a single value instead of the
+/// three independent flags it used to be — which had every call site clearing
+/// the other two by hand.
+enum LibraryChip: Hashable, Identifiable {
+    case all
+    case category(ClipCategory)
+    /// Anything the car flagged, whatever the reason.
+    case flagged
+    case trigger(ClipTrigger)
+
+    var id: String {
+        switch self {
+        case .all: return "all"
+        case .category(let category): return "category-\(category.rawValue)"
+        case .flagged: return "flagged"
+        case .trigger(let trigger): return "trigger-\(trigger.rawValue)"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .all: return "All"
+        case .category(let category): return category.label
+        case .flagged: return "Event"
+        case .trigger(let trigger): return trigger.label
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .all: return "square.grid.2x2"
+        case .category(let category): return category.symbolName
+        case .flagged: return "bolt.badge.clock"
+        case .trigger(let trigger): return trigger.symbolName
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .all: return "Every clip in the library"
+        case .category(let category): return "Clips in the \(category.folderName) folder"
+        case .flagged: return "Every clip the car flagged, including reasons SentryHub can't name"
+        case .trigger(let trigger): return "Clips the car put down to \(trigger.label.lowercased())"
+        }
+    }
+}
+
 /// Which half of the library the gallery is showing.
 enum StorageFilter: String, CaseIterable, Identifiable {
     case any, onMac, driveOnly
@@ -193,6 +243,8 @@ final class LibraryStore: ObservableObject {
     // Filters
     @Published var categoryFilter: ClipCategory?
     @Published var triggerFilter: ClipTrigger?
+    /// Set by the Event chip: any clip the car flagged, whatever the reason.
+    @Published var flaggedOnly = false
     @Published var searchText: String = ""
     @Published var storageFilter: StorageFilter = .any
     @Published var sortOrder: LibrarySortOrder = .date
@@ -413,6 +465,57 @@ final class LibraryStore: ObservableObject {
         clips.filter { $0.trigger == trigger }.count
     }
 
+    var flaggedCount: Int {
+        clips.filter(\.isFlagged).count
+    }
+
+    // MARK: - The filter row
+
+    /// Chips before the divider: everything, then the folders you keep.
+    var leadingChips: [LibraryChip] {
+        [.all] + Self.leadingCategories.map { LibraryChip.category($0) }
+    }
+
+    /// Chips after it: Sentry, then what the car said happened. `Event` leads
+    /// the group as the catch-all — it's the only way to reach clips whose
+    /// `reason` string SentryHub doesn't recognise.
+    var eventChips: [LibraryChip] {
+        var chips: [LibraryChip] = [.category(.sentry)]
+        if flaggedCount > 0 { chips.append(.flagged) }
+        chips.append(contentsOf: availableTriggers.map { LibraryChip.trigger($0) })
+        return chips
+    }
+
+    var selectedChip: LibraryChip {
+        if let triggerFilter { return .trigger(triggerFilter) }
+        if flaggedOnly { return .flagged }
+        if let categoryFilter { return .category(categoryFilter) }
+        return .all
+    }
+
+    func count(for chip: LibraryChip) -> Int {
+        switch chip {
+        case .all: return clips.count
+        case .category(let category): return counts[category] ?? 0
+        case .flagged: return flaggedCount
+        case .trigger(let trigger): return triggerCount(trigger)
+        }
+    }
+
+    /// Picking the chip that's already picked goes back to All.
+    func select(_ chip: LibraryChip) {
+        let target = selectedChip == chip ? LibraryChip.all : chip
+        categoryFilter = nil
+        triggerFilter = nil
+        flaggedOnly = false
+        switch target {
+        case .all: break
+        case .category(let category): categoryFilter = category
+        case .flagged: flaggedOnly = true
+        case .trigger(let trigger): triggerFilter = trigger
+        }
+    }
+
     /// The window the date filter currently allows, or `nil` for "any date".
     var dateInterval: DateInterval? {
         let calendar = Calendar.current
@@ -477,6 +580,10 @@ final class LibraryStore: ObservableObject {
 
         if let triggerFilter {
             result = result.filter { $0.trigger == triggerFilter }
+        }
+
+        if flaggedOnly {
+            result = result.filter(\.isFlagged)
         }
 
         if let interval = dateInterval {
@@ -550,13 +657,14 @@ final class LibraryStore: ObservableObject {
     func clearFilters() {
         categoryFilter = nil
         triggerFilter = nil
+        flaggedOnly = false
         searchText = ""
         datePreset = .any
         storageFilter = .any
     }
 
     var hasActiveFilters: Bool {
-        categoryFilter != nil || triggerFilter != nil || isDateFiltered
+        categoryFilter != nil || triggerFilter != nil || flaggedOnly || isDateFiltered
             || storageFilter != .any
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
     }

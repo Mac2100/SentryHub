@@ -287,63 +287,35 @@ struct LibraryView: View {
 
     // MARK: - Controls
 
+    private func filterChip(_ chip: LibraryChip) -> some View {
+        CountChip(
+            label: chip.label,
+            symbol: chip.symbolName,
+            count: library.count(for: chip),
+            isSelected: library.selectedChip == chip,
+            tint: theme.primary
+        ) {
+            library.select(chip)
+        }
+        .help(chip.help)
+    }
+
     private var controls: some View {
         VStack(spacing: 14) {
             HStack(spacing: 10) {
-                CountChip(
-                    label: "All", symbol: "square.grid.2x2",
-                    count: library.clips.count,
-                    isSelected: library.categoryFilter == nil && library.triggerFilter == nil,
-                    tint: theme.primary
-                ) {
-                    library.categoryFilter = nil
-                    library.triggerFilter = nil
-                }
-
-                // Folders you or the car chose to keep.
-                ForEach(LibraryStore.leadingCategories) { category in
-                    CountChip(
-                        label: category.label,
-                        symbol: category.symbolName,
-                        count: library.counts[category] ?? 0,
-                        isSelected: library.categoryFilter == category,
-                        tint: theme.primary
-                    ) {
-                        library.categoryFilter = category
-                        library.triggerFilter = nil
-                    }
+                // Everything, then the folders you or the car chose to keep.
+                ForEach(library.leadingChips) { chip in
+                    filterChip(chip)
                 }
 
                 Divider().frame(height: 22)
 
-                // Sentry sits on this side of the divider with the reasons it
-                // fired, because that's the folder those clips come from.
-                CountChip(
-                    label: ClipCategory.sentry.label,
-                    symbol: ClipCategory.sentry.symbolName,
-                    count: library.counts[.sentry] ?? 0,
-                    isSelected: library.categoryFilter == .sentry,
-                    tint: theme.primary
-                ) {
-                    library.categoryFilter = .sentry
-                    library.triggerFilter = nil
+                // Sentry sits on this side with the reasons it fired, because
+                // that's the folder those clips come from.
+                ForEach(library.eventChips) { chip in
+                    filterChip(chip)
                 }
 
-                // Why the car kept the clip, from event.json. Only kinds that
-                // actually appear in this library are offered.
-                ForEach(library.availableTriggers) { trigger in
-                    CountChip(
-                        label: trigger.label,
-                        symbol: trigger.symbolName,
-                        count: library.triggerCount(trigger),
-                        isSelected: library.triggerFilter == trigger,
-                        tint: theme.primary
-                    ) {
-                        library.triggerFilter =
-                            library.triggerFilter == trigger ? nil : trigger
-                        library.categoryFilter = nil
-                    }
-                }
                 Spacer()
             }
 
