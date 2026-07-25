@@ -156,7 +156,11 @@ struct ClipRow: View {
             } else if let reason = clip.event?.reasonLabel {
                 tag(reason, symbol: "diamond.fill", tint: .secondary)
             } else {
-                tag(clip.category.label, symbol: clip.category.symbolName, tint: .secondary)
+                // Nothing happened — this is the car recording as it drives. The
+                // folder it came from is not an answer to "what event?".
+                Text("—")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.quaternary)
             }
         }
     }

@@ -110,6 +110,16 @@ struct LibraryView: View {
                 .help("Back to the start screen")
 
                 Button {
+                    Task { await library.chooseFolder() }
+                } label: {
+                    Label("Change Folder", systemImage: "folder")
+                        .font(.system(size: 12, weight: .medium))
+                        .padding(.horizontal, 6)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+
+                Button {
                     Task { await library.rescan() }
                 } label: {
                     Label("Rescan", systemImage: "arrow.clockwise")
@@ -129,7 +139,12 @@ struct LibraryView: View {
                 .controlSize(.large)
             }
 
-            HStack(alignment: .top, spacing: 14) {
+            // A grid rather than a row: on a narrow window the cards wrap
+            // instead of squeezing each other until the text is unreadable.
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 186), spacing: 14)],
+                spacing: 14
+            ) {
                 statCard(
                     caption: "CLIPS IN LIBRARY",
                     value: "\(library.clips.count)",
@@ -149,11 +164,28 @@ struct LibraryView: View {
                     tint: Color(red: 0.13, green: 0.68, blue: 0.42)
                 )
                 statCard(
+                    caption: "EVENTS",
+                    value: "\(library.flaggedCount)",
+                    detail: eventsDetail,
+                    symbol: "bolt.badge.clock",
+                    tint: Color(red: 0.86, green: 0.36, blue: 0.24)
+                )
+                statCard(
                     caption: "INCIDENTS",
                     value: "\(incidents.incidents.count)",
-                    detail: incidents.openCount > 0 ? "\(incidents.openCount) open" : nil,
+                    detail: incidents.openCount > 0
+                        ? "\(incidents.openCount) open"
+                        : (incidents.incidents.isEmpty ? "none filed yet" : "all closed"),
                     symbol: "folder.badge.person.crop",
                     tint: Color(red: 0.50, green: 0.34, blue: 0.86)
+                )
+                statCard(
+                    caption: "NEWEST CLIP",
+                    value: library.timelineDate?
+                        .formatted(.dateTime.month(.abbreviated).day()) ?? "—",
+                    detail: newestDetail,
+                    symbol: "calendar",
+                    tint: Color(red: 0.24, green: 0.62, blue: 0.72)
                 )
                 statCard(
                     caption: "TOTAL SIZE",
@@ -162,17 +194,43 @@ struct LibraryView: View {
                     symbol: "externaldrive.fill",
                     tint: Color(red: 0.80, green: 0.60, blue: 0.16)
                 )
-                timelineCard
             }
         }
     }
 
     private var headerSubtitle: String {
+        if library.isScanning { return "Scanning…" }
         if library.isRunningWithoutDrive {
             return "No drive connected — showing the \(library.clips.count) clip"
                 + "\(library.clips.count == 1 ? "" : "s") saved on this Mac."
         }
+        if let root = library.rootURL {
+            return "Reading \(root.lastPathComponent) — open any clip to see every camera at once."
+        }
         return "Browse, filter and launch any drive session from a workspace built for fast review."
+    }
+
+    /// Which kind of event the library is mostly made of.
+    private var eventsDetail: String? {
+        guard library.flaggedCount > 0 else { return nil }
+        let busiest = library.availableTriggers.max {
+            library.triggerCount($0) < library.triggerCount($1)
+        }
+        guard let busiest else { return nil }
+        return "mostly \(busiest.label.lowercased())"
+    }
+
+    /// How long ago the newest clip was, which is the useful half of the date.
+    private var newestDetail: String? {
+        guard let date = library.timelineDate else { return nil }
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "today" }
+        if calendar.isDateInYesterday(date) { return "yesterday" }
+        let days = calendar.dateComponents(
+            [.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: Date())
+        ).day ?? 0
+        if days < 0 { return date.formatted(.dateTime.year()) }
+        return days < 30 ? "\(days) days ago" : date.formatted(.dateTime.month().year())
     }
 
     private func statCard(
@@ -219,70 +277,6 @@ struct LibraryView: View {
             RoundedRectangle(cornerRadius: 13, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         )
-    }
-
-    private var timelineCard: some View {
-        HStack(alignment: .center, spacing: 14) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 42, height: 42)
-                .background(
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .fill(theme.gradient)
-                )
-
-            VStack(alignment: .leading, spacing: 8) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Timeline")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text(timelineSubtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
-                Button {
-                    Task { await library.chooseFolder() }
-                } label: {
-                    Label("Change Folder", systemImage: "folder")
-                        .font(.system(size: 12, weight: .semibold))
-                        .lineLimit(1)
-                        // Without this the label is the first thing the HStack
-                        // squeezes, and it renders as "Change Fol…".
-                        .fixedSize(horizontal: true, vertical: false)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(theme.primary)
-                .fixedSize()
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(minWidth: 260, minHeight: 108)
-        // Keeps the card from being the one that gives up space when the four
-        // stat cards compete for width.
-        .layoutPriority(1)
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(Color.primary.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-    }
-
-    private var timelineSubtitle: String {
-        if library.isScanning { return "Scanning…" }
-        if let date = library.timelineDate {
-            return date.formatted(date: .long, time: .omitted)
-        }
-        if let root = library.rootURL { return root.lastPathComponent }
-        return library.clips.isEmpty ? "No folder selected" : "Local library only"
     }
 
     // MARK: - Controls

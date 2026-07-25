@@ -37,12 +37,14 @@ and exports a range to MP4 with the HUD burned in.
   chip says *where* a clip sits, the event chips say *why* the car kept it, and they don't always
   agree: tap save during a Sentry event and the clip stays in `SentryClips`. **Event** is the
   catch-all — it takes everything the car flagged, and it's the only way to reach clips whose
-  `reason` string SentryHub can't name., a date filter with presets and a custom range picker, search,
+  `reason` string SentryHub can't name. Cards lead with what happened — **Motion / Impact / Honk /
+  Manual Save** — and a Recent clip carries no badge at all, because nothing happened: it's the car
+  recording as it drives., a date filter with presets and a custom range picker, search,
   sorting by date/category/length/size/name, three card densities, and a **Grid / List / Map**
   switch — the grid for recognising footage by sight, the list for scanning hundreds of clips by
   their facts in aligned columns, the map for pinning every GPS-tagged clip on real tiles. The gallery is sectioned — by day, event kind, or folder —
   with sticky headers (chosen in Settings → Playback), because a real drive is hundreds of cards. Each card leads with what
-  happened (Motion / Impact / Honk / Manual), shows the date, time, town, size, and folder,
+  happened (Motion / Impact / Honk / Manual Save), shows the date, time, town, size, and storage,
   and can be **renamed** by clicking its title — the label is stored in the app, so the
   timestamped files on the drive keep the names the car gave them.
 - **Synchronised multi-camera playback** — up to six feeds (front, rear, both repeaters, both
