@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 
@@ -12,7 +13,29 @@ final class AppState: ObservableObject {
     /// The clip currently open in the player. `nil` shows the library.
     @Published var openClip: Clip?
 
-    private init() {}
+    private var cancellables: Set<AnyCancellable> = []
+
+    private init() {
+        // `library` and `updates` are nested ObservableObjects. SwiftUI only
+        // observes the object a view actually declares, so without forwarding
+        // their change events a view watching AppState — like ContentView's
+        // welcome/library/player switch, which reads `library.rootURL` — never
+        // re-renders when the library loads.
+        forward(library.objectWillChange)
+        forward(updates.objectWillChange)
+    }
+
+    private func forward(_ publisher: ObservableObjectPublisher) {
+        publisher
+            .sink { [weak self] _ in
+                // The nested stores are @MainActor, so their notifications
+                // always arrive on the main actor.
+                MainActor.assumeIsolated {
+                    self?.objectWillChange.send()
+                }
+            }
+            .store(in: &cancellables)
+    }
 
     func open(_ clip: Clip) {
         openClip = clip
