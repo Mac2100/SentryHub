@@ -33,6 +33,7 @@ struct ContentView: View {
 
 struct WelcomeView: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject private var drives = DriveWatcher.shared
     @Environment(\.appTheme) private var theme
 
     var body: some View {
@@ -69,6 +70,11 @@ struct WelcomeView: View {
             .padding(.top, 34)
             .padding(.horizontal, 40)
             .frame(maxWidth: 800)
+
+            if let drive = drives.detectedDrive {
+                detectedDriveCard(drive)
+                    .padding(.top, 28)
+            }
 
             HStack(spacing: 12) {
                 // The primary action is "get me to clips": choosing a folder
@@ -132,6 +138,60 @@ struct WelcomeView: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
+        )
+    }
+
+    /// Shown the moment a dashcam drive appears. When nothing else is loaded the
+    /// app has already opened it by the time this could be read — the card is
+    /// what's left for the case where another folder is in use, or where macOS
+    /// refused access to the volume.
+    private func detectedDriveCard(_ drive: URL) -> some View {
+        let name = drives.detectedDriveName ?? drive.lastPathComponent
+        let hasAnotherFolder = appState.library.rootURL != nil
+
+        return HStack(spacing: 13) {
+            Image(systemName: "externaldrive.fill.badge.checkmark")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(theme.gradient)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Dashcam drive detected")
+                    .font(.system(size: 14, weight: .semibold))
+                Text(name)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 20)
+
+            Button {
+                Task {
+                    await appState.library.load(root: drive)
+                    appState.showLibrary()
+                }
+            } label: {
+                Text(hasAnotherFolder ? "Switch to This Drive" : "Open")
+                    .font(.system(size: 12, weight: .semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(theme.primary)
+        }
+        .padding(14)
+        .frame(maxWidth: 520)
+        .background(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(theme.primary.opacity(0.10))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .strokeBorder(theme.primary.opacity(0.35), lineWidth: 1)
         )
     }
 

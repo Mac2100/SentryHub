@@ -105,9 +105,19 @@ struct ClipCard: View {
             Rectangle().fill(Color.black)
 
             if let poster {
-                Image(decorative: poster, scale: 1)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+                // The picture must not drive the layout. A `.fill` image reports
+                // a size larger than the space it was offered, and a ZStack sizes
+                // itself to its biggest child — so the badges and the camera
+                // button were being positioned against those overflowing bounds
+                // and then cut in half by the clip. Handing the image to an
+                // overlay keeps the stack the size of the tile.
+                Color.clear
+                    .overlay {
+                        Image(decorative: poster, scale: 1)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    }
+                    .clipped()
             } else {
                 Image(systemName: "film")
                     .font(.system(size: 26))

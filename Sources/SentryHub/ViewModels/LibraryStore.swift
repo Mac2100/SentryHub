@@ -19,11 +19,25 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 }
 
 enum LibraryPresentation: String, CaseIterable, Identifiable {
-    case grid, map
+    case grid, list, map
+
     var id: String { rawValue }
 
-    var label: String { self == .grid ? "Grid" : "Map" }
-    var symbolName: String { self == .grid ? "square.grid.2x2" : "map" }
+    var label: String {
+        switch self {
+        case .grid: return "Grid"
+        case .list: return "List"
+        case .map: return "Map"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .grid: return "square.grid.2x2"
+        case .list: return "list.bullet"
+        case .map: return "map"
+        }
+    }
 }
 
 /// Card size for the gallery — the three-step density control in the toolbar.
@@ -44,6 +58,16 @@ enum GalleryDensity: String, CaseIterable, Identifiable {
         case .compact: return 220
         case .regular: return 300
         case .large: return 420
+        }
+    }
+
+    /// Poster width in a list row. Shared with the list's column captions so
+    /// the headings stay lined up with what's underneath them.
+    var listThumbnailWidth: CGFloat {
+        switch self {
+        case .compact: return 64
+        case .regular: return 88
+        case .large: return 116
         }
     }
 
@@ -88,6 +112,56 @@ struct ClipGroup: Identifiable {
     let subtitle: String?
     let symbolName: String
     let clips: [Clip]
+}
+
+/// One chip in the library's filter row.
+///
+/// The row is one-of-N: picking a chip replaces whatever was picked before
+/// rather than stacking with it, so it lives as a single value instead of the
+/// three independent flags it used to be — which had every call site clearing
+/// the other two by hand.
+enum LibraryChip: Hashable, Identifiable {
+    case all
+    case category(ClipCategory)
+    /// Anything the car flagged, whatever the reason.
+    case flagged
+    case trigger(ClipTrigger)
+
+    var id: String {
+        switch self {
+        case .all: return "all"
+        case .category(let category): return "category-\(category.rawValue)"
+        case .flagged: return "flagged"
+        case .trigger(let trigger): return "trigger-\(trigger.rawValue)"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .all: return "All"
+        case .category(let category): return category.label
+        case .flagged: return "Event"
+        case .trigger(let trigger): return trigger.label
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .all: return "square.grid.2x2"
+        case .category(let category): return category.symbolName
+        case .flagged: return "bolt.badge.clock"
+        case .trigger(let trigger): return trigger.symbolName
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .all: return "Every clip in the library"
+        case .category(let category): return "Clips in the \(category.folderName) folder"
+        case .flagged: return "Every clip the car flagged, including reasons SentryHub can't name"
+        case .trigger(let trigger): return "Clips the car put down to \(trigger.label.lowercased())"
+        }
+    }
 }
 
 /// Which half of the library the gallery is showing.
@@ -169,6 +243,8 @@ final class LibraryStore: ObservableObject {
     // Filters
     @Published var categoryFilter: ClipCategory?
     @Published var triggerFilter: ClipTrigger?
+    /// Set by the Event chip: any clip the car flagged, whatever the reason.
+    @Published var flaggedOnly = false
     @Published var searchText: String = ""
     @Published var storageFilter: StorageFilter = .any
     @Published var sortOrder: LibrarySortOrder = .date
@@ -235,6 +311,9 @@ final class LibraryStore: ObservableObject {
 
     func load(root: URL) async {
         rootURL = root
+        // Every route into a folder goes through here — the picker, the restore,
+        // and a drive being plugged in — so this is where it gets remembered.
+        FolderAccess.remember(root)
         await rescan()
     }
 
@@ -329,6 +408,21 @@ final class LibraryStore: ObservableObject {
         }
     }
 
+    /// The drive was pulled out. Its clips go with it; the ones saved to this
+    /// Mac stay, which is the entire point of having saved them.
+    ///
+    /// The folder bookmark is deliberately kept, so plugging the drive back in
+    /// picks up where this left off.
+    func driveWasRemoved() {
+        rootURL = nil
+        resolvedRoot = nil
+        deviceClips = []
+        scanError = nil
+        durationTask?.cancel()
+        rebuild()
+        selection.formIntersection(Set(clips.map(\.id)))
+    }
+
     func forgetFolder() {
         FolderAccess.forget()
         rootURL = nil
@@ -361,10 +455,65 @@ final class LibraryStore: ObservableObject {
 
     /// Folder chips shown ahead of the divider. Sentry sits with the event
     /// kinds on the other side, because that's where its clips come from.
-    static let leadingCategories: [ClipCategory] = [.recent, .saved]
+    ///
+    /// Recent isn't offered: it's the car's rolling buffer rather than something
+    /// kept on purpose, so it's not a category you'd filter down to. Those clips
+    /// still appear under All.
+    static let leadingCategories: [ClipCategory] = [.saved]
 
     func triggerCount(_ trigger: ClipTrigger) -> Int {
         clips.filter { $0.trigger == trigger }.count
+    }
+
+    var flaggedCount: Int {
+        clips.filter(\.isFlagged).count
+    }
+
+    // MARK: - The filter row
+
+    /// Chips before the divider: everything, then the folders you keep.
+    var leadingChips: [LibraryChip] {
+        [.all] + Self.leadingCategories.map { LibraryChip.category($0) }
+    }
+
+    /// Chips after it: Sentry, then what the car said happened. `Event` leads
+    /// the group as the catch-all — it's the only way to reach clips whose
+    /// `reason` string SentryHub doesn't recognise.
+    var eventChips: [LibraryChip] {
+        var chips: [LibraryChip] = [.category(.sentry)]
+        if flaggedCount > 0 { chips.append(.flagged) }
+        chips.append(contentsOf: availableTriggers.map { LibraryChip.trigger($0) })
+        return chips
+    }
+
+    var selectedChip: LibraryChip {
+        if let triggerFilter { return .trigger(triggerFilter) }
+        if flaggedOnly { return .flagged }
+        if let categoryFilter { return .category(categoryFilter) }
+        return .all
+    }
+
+    func count(for chip: LibraryChip) -> Int {
+        switch chip {
+        case .all: return clips.count
+        case .category(let category): return counts[category] ?? 0
+        case .flagged: return flaggedCount
+        case .trigger(let trigger): return triggerCount(trigger)
+        }
+    }
+
+    /// Picking the chip that's already picked goes back to All.
+    func select(_ chip: LibraryChip) {
+        let target = selectedChip == chip ? LibraryChip.all : chip
+        categoryFilter = nil
+        triggerFilter = nil
+        flaggedOnly = false
+        switch target {
+        case .all: break
+        case .category(let category): categoryFilter = category
+        case .flagged: flaggedOnly = true
+        case .trigger(let trigger): triggerFilter = trigger
+        }
     }
 
     /// The window the date filter currently allows, or `nil` for "any date".
@@ -431,6 +580,10 @@ final class LibraryStore: ObservableObject {
 
         if let triggerFilter {
             result = result.filter { $0.trigger == triggerFilter }
+        }
+
+        if flaggedOnly {
+            result = result.filter(\.isFlagged)
         }
 
         if let interval = dateInterval {
@@ -504,13 +657,14 @@ final class LibraryStore: ObservableObject {
     func clearFilters() {
         categoryFilter = nil
         triggerFilter = nil
+        flaggedOnly = false
         searchText = ""
         datePreset = .any
         storageFilter = .any
     }
 
     var hasActiveFilters: Bool {
-        categoryFilter != nil || triggerFilter != nil || isDateFiltered
+        categoryFilter != nil || triggerFilter != nil || flaggedOnly || isDateFiltered
             || storageFilter != .any
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
     }

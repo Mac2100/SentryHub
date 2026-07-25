@@ -287,63 +287,35 @@ struct LibraryView: View {
 
     // MARK: - Controls
 
+    private func filterChip(_ chip: LibraryChip) -> some View {
+        CountChip(
+            label: chip.label,
+            symbol: chip.symbolName,
+            count: library.count(for: chip),
+            isSelected: library.selectedChip == chip,
+            tint: theme.primary
+        ) {
+            library.select(chip)
+        }
+        .help(chip.help)
+    }
+
     private var controls: some View {
         VStack(spacing: 14) {
             HStack(spacing: 10) {
-                CountChip(
-                    label: "All", symbol: "square.grid.2x2",
-                    count: library.clips.count,
-                    isSelected: library.categoryFilter == nil && library.triggerFilter == nil,
-                    tint: theme.primary
-                ) {
-                    library.categoryFilter = nil
-                    library.triggerFilter = nil
-                }
-
-                // Folders you or the car chose to keep.
-                ForEach(LibraryStore.leadingCategories) { category in
-                    CountChip(
-                        label: category.label,
-                        symbol: category.symbolName,
-                        count: library.counts[category] ?? 0,
-                        isSelected: library.categoryFilter == category,
-                        tint: theme.primary
-                    ) {
-                        library.categoryFilter = category
-                        library.triggerFilter = nil
-                    }
+                // Everything, then the folders you or the car chose to keep.
+                ForEach(library.leadingChips) { chip in
+                    filterChip(chip)
                 }
 
                 Divider().frame(height: 22)
 
-                // Sentry sits on this side of the divider with the reasons it
-                // fired, because that's the folder those clips come from.
-                CountChip(
-                    label: ClipCategory.sentry.label,
-                    symbol: ClipCategory.sentry.symbolName,
-                    count: library.counts[.sentry] ?? 0,
-                    isSelected: library.categoryFilter == .sentry,
-                    tint: theme.primary
-                ) {
-                    library.categoryFilter = .sentry
-                    library.triggerFilter = nil
+                // Sentry sits on this side with the reasons it fired, because
+                // that's the folder those clips come from.
+                ForEach(library.eventChips) { chip in
+                    filterChip(chip)
                 }
 
-                // Why the car kept the clip, from event.json. Only kinds that
-                // actually appear in this library are offered.
-                ForEach(library.availableTriggers) { trigger in
-                    CountChip(
-                        label: trigger.label,
-                        symbol: trigger.symbolName,
-                        count: library.triggerCount(trigger),
-                        isSelected: library.triggerFilter == trigger,
-                        tint: theme.primary
-                    ) {
-                        library.triggerFilter =
-                            library.triggerFilter == trigger ? nil : trigger
-                        library.categoryFilter = nil
-                    }
-                }
                 Spacer()
             }
 
@@ -621,30 +593,57 @@ struct LibraryView: View {
                 }
                 .frame(minHeight: 480)
             } else {
-                LazyVStack(alignment: .leading, spacing: 26, pinnedViews: [.sectionHeaders]) {
+                if library.presentation == .list {
+                    ClipListHeader(
+                        isSelecting: library.isSelecting,
+                        thumbnailWidth: library.density.listThumbnailWidth
+                    )
+                }
+
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: library.presentation == .list ? 16 : 26,
+                    pinnedViews: [.sectionHeaders]
+                ) {
                     ForEach(library.groups) { group in
                         Section {
-                            LazyVGrid(
-                                columns: [
-                                    GridItem(
-                                        .adaptive(minimum: library.density.minimumCardWidth),
-                                        spacing: 16
-                                    )
-                                ],
-                                spacing: 16
-                            ) {
-                                ForEach(group.clips) { clip in
-                                    ClipCard(
-                                        clip: clip,
-                                        density: library.density,
-                                        isSelecting: library.isSelecting,
-                                        isSelected: library.selection.contains(clip.id),
-                                        onToggleSelection: {
-                                            library.beginSelecting()
-                                            library.toggleSelection(clip.id)
+                            // Both presentations share the sections, the sticky
+                            // headers, and the selection wiring; only the shape
+                            // of a clip changes.
+                            if library.presentation == .list {
+                                VStack(spacing: 4) {
+                                    ForEach(group.clips) { clip in
+                                        ClipRow(
+                                            clip: clip,
+                                            density: library.density,
+                                            isSelecting: library.isSelecting,
+                                            isSelected: library.selection.contains(clip.id),
+                                            onToggleSelection: { toggle(clip) }
+                                        ) {
+                                            appState.open(clip)
                                         }
-                                    ) {
-                                        appState.open(clip)
+                                    }
+                                }
+                            } else {
+                                LazyVGrid(
+                                    columns: [
+                                        GridItem(
+                                            .adaptive(minimum: library.density.minimumCardWidth),
+                                            spacing: 16
+                                        )
+                                    ],
+                                    spacing: 16
+                                ) {
+                                    ForEach(group.clips) { clip in
+                                        ClipCard(
+                                            clip: clip,
+                                            density: library.density,
+                                            isSelecting: library.isSelecting,
+                                            isSelected: library.selection.contains(clip.id),
+                                            onToggleSelection: { toggle(clip) }
+                                        ) {
+                                            appState.open(clip)
+                                        }
                                     }
                                 }
                             }
@@ -655,6 +654,11 @@ struct LibraryView: View {
                 }
             }
         }
+    }
+
+    private func toggle(_ clip: Clip) {
+        library.beginSelecting()
+        library.toggleSelection(clip.id)
     }
 
     /// Sticky section header — the gallery runs to hundreds of cards on a real

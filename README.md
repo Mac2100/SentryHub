@@ -17,7 +17,7 @@ and exports a range to MP4 with the HUD burned in.
 - **A library, not a window onto a USB stick** — the dashcam drive is a rolling buffer: the car
   overwrites it, and everything on it vanishes when you unplug it. Select clips and **Save to Mac**
   to copy them into a local library that's still there tomorrow. The drive and the local copies are
-  merged into one gallery — one card per clip, labelled **Saved** or **Drive only** — with a
+  merged into one gallery — one card per clip, labelled **On this Mac** or **Drive only** — with a
   **Storage** filter for *Everywhere / On This Mac / Drive Only*. With no drive connected, SentryHub
   opens straight into whatever you kept.
 - **Incidents** — a second tab where clips are grouped into the thing that actually happened: every
@@ -31,11 +31,16 @@ and exports a range to MP4 with the HUD burned in.
   they'll destroy first — including the fact that dashcam drives have no Trash, so deleting off one
   is permanent.
 - **Clip library** — the app opens straight into the gallery: clips loaded, GPS-tagged, camera
-  streams, and total storage at a glance. Filter chips for **All / Sentry / Saved / Recent** plus
-  trigger chips derived from `event.json` (**Motion / Impact / Honk / Saved by You**, offered only
-  when clips of that kind exist), a date filter with presets and a custom range picker, search,
-  sorting by date/category/length/size/name, three card densities, and a **Grid / Map** switch that pins
-  every GPS-tagged clip on a real map. The gallery is sectioned — by day, event kind, or folder —
+  streams, and total storage at a glance. Filter chips for **All / Saved / Sentry** plus
+  an **Event** chip and the trigger chips derived from `event.json`
+  (**Motion / Impact / Honk / Manual Save**, offered only when clips of that kind exist). The folder
+  chip says *where* a clip sits, the event chips say *why* the car kept it, and they don't always
+  agree: tap save during a Sentry event and the clip stays in `SentryClips`. **Event** is the
+  catch-all — it takes everything the car flagged, and it's the only way to reach clips whose
+  `reason` string SentryHub can't name., a date filter with presets and a custom range picker, search,
+  sorting by date/category/length/size/name, three card densities, and a **Grid / List / Map**
+  switch — the grid for recognising footage by sight, the list for scanning hundreds of clips by
+  their facts in aligned columns, the map for pinning every GPS-tagged clip on real tiles. The gallery is sectioned — by day, event kind, or folder —
   with sticky headers (chosen in Settings → Playback), because a real drive is hundreds of cards. Each card leads with what
   happened (Motion / Impact / Honk / Manual), shows the date, time, town, size, and folder,
   and can be **renamed** by clicking its title — the label is stored in the app, so the
@@ -117,8 +122,13 @@ For development, `swift run` works directly, or open `Package.swift` in Xcode.
 
 ## Using it
 
-Plug in the dashcam drive and choose it with **Choose Your TeslaCam Folder** (⌘O). SentryHub
-accepts the drive root, the `TeslaCam` folder itself, or any folder of clips you copied off it:
+**Plug the drive in and SentryHub opens it.** Mounted volumes are watched, and a drive holding a
+`TeslaCam` folder is loaded straight into the library — at launch or the moment it appears. If a
+different folder is already open the library is left alone and you're told the drive is there
+instead. Pull the drive out and its clips leave with it, while anything saved to this Mac stays.
+
+You can still pick a folder by hand with **Choose Your TeslaCam Folder** (⌘O). SentryHub accepts
+the drive root, the `TeslaCam` folder itself, or any folder of clips you copied off it:
 
 ```
 <drive>/
