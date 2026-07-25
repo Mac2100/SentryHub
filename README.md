@@ -32,23 +32,24 @@ and exports a range to MP4 with the HUD burned in.
   remove local copies, or clear clips off the drive. Both destructive actions state exactly what
   they'll destroy first — including the fact that dashcam drives have no Trash, so deleting off one
   is permanent.
-- **Clip library** — the app opens straight into the gallery: clips loaded, GPS-tagged, camera
-  streams, and total storage at a glance. Filter chips for **All / Saved / Sentry** plus
-  an **Event** chip and the trigger chips derived from `event.json`
-  (**Motion / Impact / Honk / Manual Save**, offered only when clips of that kind exist). The folder
-  chip says *where* a clip sits, the event chips say *why* the car kept it, and they don't always
-  agree: tap save during a Sentry event and the clip stays in `SentryClips`. **Event** is the
-  catch-all — it takes everything the car flagged, and it's the only way to reach clips whose
-  `reason` string SentryHub can't name. Cards lead with what happened — **Motion / Impact / Honk /
-  Manual Save** — and a Recent clip carries no badge at all, because nothing happened: it's the car
-  recording as it drives., a date filter with presets and a custom range picker, search,
-  sorting by date/category/length/size/name, three card densities, and a **Grid / List / Map**
-  switch — the grid for recognising footage by sight, the list for scanning hundreds of clips by
-  their facts in aligned columns, the map for pinning every GPS-tagged clip on real tiles. The gallery is sectioned — by day, event kind, or folder —
-  with sticky headers (chosen in Settings → Playback), because a real drive is hundreds of cards. Each card leads with what
-  happened (Motion / Impact / Honk / Manual Save), shows the date, time, town, size, and storage,
-  and can be **renamed** by clicking its title — the label is stored in the app, so the
-  timestamped files on the drive keep the names the car gave them.
+- **Clip library** — the app opens straight into the gallery: clips loaded, what's on this Mac,
+  events, incidents, recency, and total size at a glance. The filter row is a hierarchy, not a flat
+  list: **All**, then **Sentry** with the reasons the car flags by itself (*Motion*, *Impact*), then
+  **Saved** with the ways a driver asks for a clip to be kept (*Honk*, *Manual Save*), and an
+  **Other** chip that appears only when a clip carries a `reason` SentryHub can't name. A folder
+  says *where* a clip sits; a reason says *why* the car kept it, and they don't always agree — tap
+  save during a Sentry event and the clip stays in `SentryClips`.
+
+  Plus a date filter with presets and a custom range picker, search over name, town, street, event,
+  and incident, sorting by date/category/length/size/name, three card densities, and a
+  **Grid / List / Map** switch — the grid for recognising footage by sight, the list for scanning
+  hundreds of clips by their facts in aligned columns, the map for pinning every GPS-tagged clip on
+  real tiles. The gallery is sectioned by day, event kind, or folder with sticky headers (chosen in
+  Settings → Playback), because a real drive is hundreds of cards. Each card leads with what
+  happened — and a Recent clip carries no badge at all, because nothing did: it's the car recording
+  as it drives. Cards show date, time, place, size, and storage, and can be **renamed** by clicking
+  the title — the label is stored in the app, so the timestamped files on the drive keep the names
+  the car gave them.
 - **Synchronised multi-camera playback** — up to six feeds (front, rear, both repeaters, both
   B-pillars) each backed by its own `AVPlayer`, started at a shared host time and drift-corrected
   every two seconds. A Sentry event's ~60-second segments are stitched into one continuous
@@ -64,16 +65,24 @@ and exports a range to MP4 with the HUD burned in.
   Theme (Dark / Light / Satellite), Rotation (Heading / North Up), Zoom level, Size (S / M / L), and
   Route Overview; corner, route line, endpoint markers, label, export inclusion, and opacity live in
   Settings → HUD. Real map tiles are snapshotted once per clip and sit under the route, so a clip
-  whose only fix is the one in `event.json` still shows where it happened. Behind the same button
+  whose only fix is the one in `event.json` still shows where it happened — as a **single pin**,
+  said plainly, rather than a route line and a pair of start/finish flags stacked on one address.
+  Tesla records one position per clip and nothing per second, so most clips have no route to follow;
+  drop in a [sidecar](#sidecar-schema) and the map moves. Behind the same button
   sits a fully interactive route map whose camera follows the play head — or frames the whole drive
   when Route Overview is on.
 - **Trim & export** — set IN and OUT points on the timeline, then export the current grid to MP4.
   The HUD is rendered by the *same* SwiftUI view the player uses, so exports are WYSIWYG. Also
   exports the current frame as a PNG.
-- **Event focus** — the moment the car flagged (Sentry trigger, horn, manual save) is marked on the
-  timeline and reachable with one click or the `E` key, landing a few seconds early — for any event
-  kind — so the lead-in is visible; the run-up is adjustable in Settings → Playback. The camera that saw it is traced with a pulsing highlight that quickens as the play head
-  closes in.
+- **Event focus** — Tesla wraps roughly ten minutes of buffer around a Sentry trigger, so the moment
+  you opened the clip for is usually nine minutes in. A clip with a flagged moment therefore **opens
+  a minute before it** rather than at 0:00, and the marker is reachable with one click or the `E`
+  key, landing **20 seconds early** so the lead-in is visible. Both distances are adjustable in
+  Settings → Playback, and clips with no event still open at the start. The camera that
+  saw it is traced with a pulsing highlight that quickens as the play head closes in — but only for
+  a **Sentry motion or impact**, and only in the seconds around the event itself. A horn press or a
+  manual save is the driver already knowing what happened, and a highlight shown on every clip is
+  one nobody reads.
 - **Themes & appearance** — six accent themes and a System/Light/Dark override.
 - **One-click updates** — an optional launch check against GitHub Releases; installing downloads
   the DMG, swaps the app in place, and relaunches.
@@ -172,14 +181,20 @@ next to Sentry and Saved clips, holding one approximate fix:
 
 ```json
 {
-  "timestamp": "2025-12-21T20:59:54",
-  "city": "…",
-  "est_lat": "48.0610",
-  "est_lon": "3.2910",
+  "timestamp": "2026-07-25T14:57:38",
+  "city": "Fair Lawn",
+  "street": "River Rd",
+  "est_lat": "40.93",
+  "est_lon": "-74.1316",
   "reason": "sentry_aware_object_detection",
-  "camera": "0"
+  "camera": "6"
 }
 ```
+
+`street` arrived in newer firmware; `reason` comes in two families, `sentry_aware_*` for what the
+car noticed by itself and `user_interaction_*` for what the driver asked it to keep. Tesla publishes
+none of this and has changed the strings across firmware, so a reason SentryHub doesn't recognise is
+shown as-is and offered under the **Other** chip rather than guessed into the nearest bucket.
 
 SentryHub tries three sources, richest first, and draws `—` for any field none of them supplied —
 it never invents numbers:
@@ -189,6 +204,11 @@ it never invents numbers:
 2. **Metadata embedded in the MP4** — a timed metadata track or an ISO-6709 location atom, both
    read when the firmware wrote them.
 3. **`event.json`** — one static fix, enough to place the map pin.
+
+The `camera` index in `event.json` is the car's own camera enumeration, not the order TeslaCam
+writes files in: `0`–`2` all look forward, `3`/`4` are the B-pillars, `5`/`6` the repeaters, `7` the
+rear. Index 6 is confirmed against a real event whose subject appears first on the right repeater.
+An index SentryHub doesn't know simply singles out no tile.
 
 The clock in the HUD always works: it comes from the clip's own start time plus the play head, not
 from telemetry.

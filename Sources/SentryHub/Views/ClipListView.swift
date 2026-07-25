@@ -50,9 +50,9 @@ struct ClipRow: View {
                     Text(clip.startDate.formatted(.dateTime.month(.abbreviated).day().year()))
                     Text("·")
                     Text(clip.startDate.formatted(date: .omitted, time: .shortened))
-                    if let city = clip.city {
+                    if let place = clip.placeLabel {
                         Text("·")
-                        Text(city).lineLimit(1)
+                        Text(place).lineLimit(1)
                     }
                     if let incident = incidents.incidents(containing: clip.id).first {
                         Text("·")

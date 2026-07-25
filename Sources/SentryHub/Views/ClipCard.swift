@@ -292,9 +292,9 @@ struct ClipCard: View {
             // names a town in event.json, which it doesn't write beside Recent
             // clips — so rather than leaving those cards with a silent gap,
             // fall back to the fix and then to saying there isn't one.
-            if let city = clip.city {
-                metaRow(symbol: "building.2", text: city)
-                    .help(coordinateText ?? city)
+            if let place = clip.placeLabel {
+                metaRow(symbol: "building.2", text: place)
+                    .help(coordinateText ?? place)
             } else if let coordinateText {
                 metaRow(symbol: "mappin.and.ellipse", text: coordinateText)
             } else {

@@ -33,7 +33,7 @@ struct LibraryMapView: View {
                 ForEach(clips) { clip in
                     if let coordinate = clip.coordinate {
                         Marker(
-                            clip.city ?? labels.title(for: clip),
+                            clip.placeLabel ?? labels.title(for: clip),
                             systemImage: clip.category.symbolName,
                             coordinate: CLLocationCoordinate2D(
                                 latitude: coordinate.latitude, longitude: coordinate.longitude
@@ -90,8 +90,8 @@ struct LibraryMapView: View {
             Text(clip.startDate.briefFormatted)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if let city = clip.city {
-                Label(city, systemImage: "building.2")
+            if let place = clip.placeLabel {
+                Label(place, systemImage: "building.2")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -133,21 +133,31 @@ struct RouteMapView: View {
         )
     }
 
+    /// Whether the car actually moved, as far as the data knows.
+    private var hasRoute: Bool { route.describesRoute }
+
     var body: some View {
         Map(position: $position) {
-            if route.count > 1 {
+            if hasRoute {
                 MapPolyline(coordinates: route)
                     .stroke(
                         Color(red: 0.25, green: 0.62, blue: 1.0),
                         style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
                     )
             }
-            if config.mapShowEndpoints, let first = route.first {
+            // Start and finish flags only mean something when they're in
+            // different places. With one fix they stack on the same pin and
+            // imply a journey the car never recorded.
+            if config.mapShowEndpoints, hasRoute, let first = route.first {
                 Marker("Start", systemImage: "flag.fill", coordinate: first)
                     .tint(.green)
             }
-            if config.mapShowEndpoints, route.count > 1, let last = route.last {
+            if config.mapShowEndpoints, hasRoute, let last = route.last {
                 Marker("End", systemImage: "flag.checkered", coordinate: last)
+                    .tint(.orange)
+            }
+            if !hasRoute, let only = route.first {
+                Marker("Recorded here", systemImage: "mappin", coordinate: only)
                     .tint(.orange)
             }
             if let current {
@@ -172,15 +182,25 @@ struct RouteMapView: View {
             MapZoomStepper()
         }
         .overlay(alignment: .topLeading) {
-            Label(
-                config.mapRouteOverview ? "Route Overview" : "Following",
-                systemImage: config.mapRouteOverview ? "point.topleft.down.curvedto.point.bottomright.up" : "location.fill"
-            )
-            .font(.caption)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.regularMaterial, in: Capsule())
-            .padding(8)
+            Label(statusLabel, systemImage: statusSymbol)
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.regularMaterial, in: Capsule())
+                .padding(8)
+        }
+        .overlay(alignment: .bottom) {
+            if !route.isEmpty, !hasRoute {
+                // Otherwise a static map reads as a broken one.
+                Text("Tesla saved one position for this clip, so there's no route to follow.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(10)
+            }
         }
         .onChange(of: currentKey) { _, _ in recentre() }
         .onChange(of: config.mapRouteOverview) { _, _ in recentre() }
@@ -205,7 +225,33 @@ struct RouteMapView: View {
         }
     }
 
+    private var statusLabel: String {
+        if !route.isEmpty, !hasRoute { return "Single position" }
+        return config.mapRouteOverview ? "Route Overview" : "Following"
+    }
+
+    private var statusSymbol: String {
+        if !route.isEmpty, !hasRoute { return "mappin" }
+        return config.mapRouteOverview
+            ? "point.topleft.down.curvedto.point.bottomright.up"
+            : "location.fill"
+    }
+
     private func recentre() {
+        // One fix has no extent, and `.automatic` framing a zero-size region is
+        // what pinned the map to a street-level view of a single address.
+        if !hasRoute, let only = route.first {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                position = .region(
+                    MKCoordinateRegion(
+                        center: only,
+                        latitudinalMeters: max(regionSpanMeters, 700),
+                        longitudinalMeters: max(regionSpanMeters, 700)
+                    )
+                )
+            }
+            return
+        }
         guard followsCar, let current else {
             // .automatic frames all the map's content, i.e. the whole route.
             withAnimation(.easeInOut(duration: 0.3)) { position = .automatic }

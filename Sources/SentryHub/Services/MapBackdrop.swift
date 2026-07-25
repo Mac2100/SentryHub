@@ -42,7 +42,10 @@ enum MapBackdropRenderer {
         fallback: CLLocationCoordinate2D?,
         zoomLevel: Double
     ) -> MKCoordinateRegion? {
-        if route.count > 1 {
+        // `describesRoute`, not `count`: event.json's single fix arrives as two
+        // identical samples, and a bounding box around those is zero-sized —
+        // which the padding floor then turns into a street-level crop.
+        if route.describesRoute {
             var minLat = route[0].latitude, maxLat = route[0].latitude
             var minLon = route[0].longitude, maxLon = route[0].longitude
             for point in route {

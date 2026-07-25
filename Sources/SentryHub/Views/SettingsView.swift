@@ -177,7 +177,8 @@ struct AppearanceSettingsView: View {
 struct PlaybackSettingsView: View {
     @AppStorage("defaultLayout") private var defaultLayout = CameraLayout.six.rawValue
     @AppStorage("galleryDensity") private var galleryDensity = GalleryDensity.regular.rawValue
-    @AppStorage("eventPreRoll") private var eventPreRoll = 5.0
+    @AppStorage("eventPreRoll") private var eventPreRoll = 20.0
+    @AppStorage("openingLeadIn") private var openingLeadIn = 60.0
     @AppStorage("galleryGrouping") private var galleryGrouping = ClipGrouping.day.rawValue
 
     var body: some View {
@@ -201,7 +202,20 @@ struct PlaybackSettingsView: View {
             Section {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("Event run-up")
+                        Text("Open clips before the event")
+                        Spacer()
+                        Text(openingLeadIn < 1
+                             ? "At the start"
+                             : "\(Int(openingLeadIn))s before")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Slider(value: $openingLeadIn, in: 0...300, step: 15)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Event jump run-up")
                         Spacer()
                         Text(eventPreRoll < 1
                              ? "None"
@@ -209,10 +223,10 @@ struct PlaybackSettingsView: View {
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
-                    Slider(value: $eventPreRoll, in: 0...15, step: 1)
+                    Slider(value: $eventPreRoll, in: 0...120, step: 5)
                 }
             } footer: {
-                Text("How far ahead of the flagged moment the event jump lands — for any event, whether it was motion, an impact, the horn, or a manual save.")
+                Text("Tesla keeps around ten minutes of buffer either side of a Sentry trigger, so the moment you opened the clip for is usually minutes in. Clips with a flagged moment open just before it instead of at 0:00, and the event jump lands with enough run-up to see what led up to it. Clips with no event always open at the start.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -111,8 +111,14 @@ struct TelemetryTrack: Hashable {
 
     var isEmpty: Bool { samples.isEmpty }
 
-    /// True when the track has more than one fix, i.e. an actual route.
-    var hasRoute: Bool { route.count > 1 }
+    /// True when the track describes an actual path, not one position repeated.
+    ///
+    /// Counting samples isn't enough: `event.json` carries a single fix, which
+    /// the loader holds for the whole clip as two identical samples so the pin
+    /// has a start and an end. Treating those as a route is what made a
+    /// ten-minute drive draw as a zero-length line with the start and finish
+    /// flags stacked on one address.
+    var hasRoute: Bool { route.describesRoute }
 
     var route: [CLLocationCoordinate2D] {
         samples.compactMap(\.coordinate)
@@ -314,4 +320,28 @@ struct TelemetryAvailability: Equatable {
 
     /// True when nothing beyond the clock is known.
     var isClockOnly: Bool { self == .clockOnly }
+}
+
+// MARK: - Route shape
+
+extension Array where Element == CLLocationCoordinate2D {
+    /// Whether these fixes describe a path the car travelled, rather than one
+    /// position recorded once and held.
+    ///
+    /// Tesla writes a single `est_lat`/`est_lon` into `event.json` and nothing
+    /// per-second, so most clips have exactly one place to their name. Drawing
+    /// a route line, a start flag, and a finish flag for that is a picture of
+    /// data the car never recorded.
+    var describesRoute: Bool {
+        guard let first = self.first else { return false }
+        return contains { !$0.isEssentially(first) }
+    }
+}
+
+extension CLLocationCoordinate2D {
+    /// ~0.1 m — far below the accuracy of anything Tesla writes, so this only
+    /// ever collapses fixes that are literally the same reading.
+    func isEssentially(_ other: CLLocationCoordinate2D) -> Bool {
+        abs(latitude - other.latitude) < 1e-6 && abs(longitude - other.longitude) < 1e-6
+    }
 }

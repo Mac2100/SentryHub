@@ -122,17 +122,20 @@ struct ClipGroup: Identifiable {
 /// the other two by hand.
 enum LibraryChip: Hashable, Identifiable {
     case all
+    /// A folder on the drive — *where* a clip sits.
     case category(ClipCategory)
-    /// Anything the car flagged, whatever the reason.
-    case flagged
+    /// A `reason` from `event.json` — *why* the clip was kept.
     case trigger(ClipTrigger)
+    /// Clips whose reason SentryHub can't name. The only clips no other chip
+    /// can reach, so it appears only when there are some.
+    case unclassified
 
     var id: String {
         switch self {
         case .all: return "all"
         case .category(let category): return "category-\(category.rawValue)"
-        case .flagged: return "flagged"
         case .trigger(let trigger): return "trigger-\(trigger.rawValue)"
+        case .unclassified: return "unclassified"
         }
     }
 
@@ -140,8 +143,8 @@ enum LibraryChip: Hashable, Identifiable {
         switch self {
         case .all: return "All"
         case .category(let category): return category.label
-        case .flagged: return "Event"
         case .trigger(let trigger): return trigger.label
+        case .unclassified: return "Other"
         }
     }
 
@@ -149,17 +152,25 @@ enum LibraryChip: Hashable, Identifiable {
         switch self {
         case .all: return "square.grid.2x2"
         case .category(let category): return category.symbolName
-        case .flagged: return "bolt.badge.clock"
         case .trigger(let trigger): return trigger.symbolName
+        case .unclassified: return "questionmark.diamond"
         }
     }
 
     var help: String {
         switch self {
-        case .all: return "Every clip in the library"
-        case .category(let category): return "Clips in the \(category.folderName) folder"
-        case .flagged: return "Every clip the car flagged, including reasons SentryHub can't name"
-        case .trigger(let trigger): return "Clips the car put down to \(trigger.label.lowercased())"
+        case .all:
+            return "Every clip in the library"
+        case .category(.sentry):
+            return "The SentryClips folder — everything the car kept while parked"
+        case .category(.saved):
+            return "The SavedClips folder — everything you asked the car to keep"
+        case .category(let category):
+            return "Clips in the \(category.folderName) folder"
+        case .trigger(let trigger):
+            return "Clips whose event.json reason was \(trigger.label.lowercased())"
+        case .unclassified:
+            return "Clips with a reason SentryHub doesn't recognise yet"
         }
     }
 }
@@ -243,8 +254,8 @@ final class LibraryStore: ObservableObject {
     // Filters
     @Published var categoryFilter: ClipCategory?
     @Published var triggerFilter: ClipTrigger?
-    /// Set by the Event chip: any clip the car flagged, whatever the reason.
-    @Published var flaggedOnly = false
+    /// Set by the Other chip: clips with a reason SentryHub can't name.
+    @Published var unclassifiedOnly = false
     @Published var searchText: String = ""
     @Published var storageFilter: StorageFilter = .any
     @Published var sortOrder: LibrarySortOrder = .date
@@ -471,24 +482,42 @@ final class LibraryStore: ObservableObject {
 
     // MARK: - The filter row
 
-    /// Chips before the divider: everything, then the folders you keep.
-    var leadingChips: [LibraryChip] {
-        [.all] + Self.leadingCategories.map { LibraryChip.category($0) }
+    var unclassifiedCount: Int {
+        clips.filter(\.hasUnclassifiedEvent).count
     }
 
-    /// Chips after it: Sentry, then what the car said happened. `Event` leads
-    /// the group as the catch-all — it's the only way to reach clips whose
-    /// `reason` string SentryHub doesn't recognise.
-    var eventChips: [LibraryChip] {
-        var chips: [LibraryChip] = [.category(.sentry)]
-        if flaggedCount > 0 { chips.append(.flagged) }
-        chips.append(contentsOf: availableTriggers.map { LibraryChip.trigger($0) })
-        return chips
+    /// The filter row, in three groups.
+    ///
+    /// Folder and reason are different questions — *where* a clip sits versus
+    /// *why* the car kept it — and a flat row of chips made them look like one
+    /// list of equivalent categories. They're a hierarchy: each folder is the
+    /// parent of the reasons that only ever occur inside it, because Tesla's
+    /// `sentry_aware_*` reasons land in SentryClips and its `user_interaction_*`
+    /// reasons land in SavedClips. So each folder chip leads its own reasons.
+    var leadingChips: [LibraryChip] { [.all] }
+
+    /// Sentry, and the things the car notices by itself.
+    var sentryChips: [LibraryChip] {
+        [.category(.sentry)] + triggerChips(for: .sentry)
+    }
+
+    /// Saved, and the ways a driver asks for a clip to be kept.
+    var savedChips: [LibraryChip] {
+        [.category(.saved)] + triggerChips(for: .saved)
+    }
+
+    /// Only offered when it would reveal something the others can't.
+    var otherChips: [LibraryChip] {
+        unclassifiedCount > 0 ? [.unclassified] : []
+    }
+
+    private func triggerChips(for origin: ClipCategory) -> [LibraryChip] {
+        availableTriggers.filter { $0.origin == origin }.map { LibraryChip.trigger($0) }
     }
 
     var selectedChip: LibraryChip {
         if let triggerFilter { return .trigger(triggerFilter) }
-        if flaggedOnly { return .flagged }
+        if unclassifiedOnly { return .unclassified }
         if let categoryFilter { return .category(categoryFilter) }
         return .all
     }
@@ -497,8 +526,8 @@ final class LibraryStore: ObservableObject {
         switch chip {
         case .all: return clips.count
         case .category(let category): return counts[category] ?? 0
-        case .flagged: return flaggedCount
         case .trigger(let trigger): return triggerCount(trigger)
+        case .unclassified: return unclassifiedCount
         }
     }
 
@@ -507,12 +536,12 @@ final class LibraryStore: ObservableObject {
         let target = selectedChip == chip ? LibraryChip.all : chip
         categoryFilter = nil
         triggerFilter = nil
-        flaggedOnly = false
+        unclassifiedOnly = false
         switch target {
         case .all: break
         case .category(let category): categoryFilter = category
-        case .flagged: flaggedOnly = true
         case .trigger(let trigger): triggerFilter = trigger
+        case .unclassified: unclassifiedOnly = true
         }
     }
 
@@ -582,8 +611,8 @@ final class LibraryStore: ObservableObject {
             result = result.filter { $0.trigger == triggerFilter }
         }
 
-        if flaggedOnly {
-            result = result.filter(\.isFlagged)
+        if unclassifiedOnly {
+            result = result.filter(\.hasUnclassifiedEvent)
         }
 
         if let interval = dateInterval {
@@ -609,6 +638,9 @@ final class LibraryStore: ObservableObject {
                        incident.reference.lowercased().contains(query) { return true }
                 }
                 if let city = clip.city?.lowercased(), city.contains(query) { return true }
+                // The search field has always offered "street"; until the
+                // decoder learned the field, it was never going to match one.
+                if let street = clip.street?.lowercased(), street.contains(query) { return true }
                 if let reason = clip.event?.reasonLabel?.lowercased(), reason.contains(query) {
                     return true
                 }
@@ -657,14 +689,14 @@ final class LibraryStore: ObservableObject {
     func clearFilters() {
         categoryFilter = nil
         triggerFilter = nil
-        flaggedOnly = false
+        unclassifiedOnly = false
         searchText = ""
         datePreset = .any
         storageFilter = .any
     }
 
     var hasActiveFilters: Bool {
-        categoryFilter != nil || triggerFilter != nil || flaggedOnly || isDateFiltered
+        categoryFilter != nil || triggerFilter != nil || unclassifiedOnly || isDateFiltered
             || storageFilter != .any
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
     }

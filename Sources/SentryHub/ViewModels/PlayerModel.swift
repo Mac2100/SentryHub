@@ -152,6 +152,11 @@ final class PlayerModel: ObservableObject {
 
         attachObservers()
 
+        // Open near what you came to see. A Sentry clip is ten minutes of
+        // buffer wrapped around a few seconds that matter.
+        let opening = openingPosition
+        if opening > 0 { seek(to: opening) }
+
         let loaded = await TelemetryLoader.load(for: clip)
         telemetry = loaded
         availability = TelemetryAvailability(track: loaded, hasCity: clip.city != nil)
@@ -382,9 +387,28 @@ final class PlayerModel: ObservableObject {
     /// at the moment itself. Adjustable in Settings → Playback.
     static var eventPreRoll: TimeInterval {
         guard let stored = UserDefaults.standard.object(forKey: "eventPreRoll") as? Double else {
-            return 5
+            return 20
         }
-        return min(max(stored, 0), 30)
+        return min(max(stored, 0), 120)
+    }
+
+    /// How far before the event a clip opens.
+    ///
+    /// Tesla keeps about ten minutes of buffer around a Sentry trigger, so the
+    /// thing you opened the clip for is usually nine minutes in. Starting at
+    /// 0:00 means watching an empty street until it happens.
+    static var openingLeadIn: TimeInterval {
+        guard let stored = UserDefaults.standard.object(forKey: "openingLeadIn") as? Double else {
+            return 60
+        }
+        return min(max(stored, 0), 600)
+    }
+
+    /// Where playback should begin: a minute before the event when there is
+    /// one, otherwise the top of the clip.
+    var openingPosition: TimeInterval {
+        guard Self.openingLeadIn > 0, let eventOffset else { return 0 }
+        return max(0, eventOffset - Self.openingLeadIn)
     }
 
     func jumpToEvent() {
@@ -394,6 +418,27 @@ final class PlayerModel: ObservableObject {
 
     /// True while the play head is inside the window the event flash covers.
     var isNearEvent: Bool { eventUrgency > 0 }
+
+    /// Whether the loud tile highlight is warranted for this clip at all.
+    ///
+    /// It exists to say *look here* — so it's reserved for the car noticing
+    /// something on its own: Sentry motion and impacts. A horn press or a
+    /// manual save is the driver already knowing what happened, and a driving
+    /// clip has nothing in particular to point at. A highlight that shows on
+    /// every clip is one nobody reads, which makes it worse than none.
+    var deservesEventTrace: Bool {
+        guard clip.event?.triggerCamera != nil, eventOffset != nil else { return false }
+        switch clip.trigger {
+        case .motion, .impact: return true
+        case .honk, .manualSave, .none: return false
+        }
+    }
+
+    /// The trace is on screen only around the moment it's pointing at, so it
+    /// arrives as the thing happens rather than burning for ten minutes.
+    var showsEventTrace: Bool {
+        deservesEventTrace && eventUrgency > 0
+    }
 
     /// 0…1, rising as the play head closes on the event. Drives how fast and
     /// bright the event camera's trace pulses.
