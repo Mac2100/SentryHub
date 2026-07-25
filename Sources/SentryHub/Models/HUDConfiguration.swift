@@ -104,7 +104,7 @@ enum MapStyleOption: String, Codable, CaseIterable, Identifiable {
 }
 
 enum MapTrackStyle: String, Codable, CaseIterable, Identifiable {
-    case full, traveled, none
+    case full, traveled, hidden
 
     var id: String { rawValue }
 
@@ -112,7 +112,7 @@ enum MapTrackStyle: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .full: return "Whole Route"
         case .traveled: return "Traveled Only"
-        case .none: return "Hidden"
+        case .hidden: return "Hidden"
         }
     }
 }

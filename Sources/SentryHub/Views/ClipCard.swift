@@ -8,7 +8,7 @@ struct ClipCard: View {
     let onOpen: () -> Void
 
     @Environment(\.appTheme) private var theme
-    @State private var poster: NSImage?
+    @State private var poster: CGImage?
     @State private var previewCamera: CameraAngle?
     @State private var isHovering = false
 
@@ -66,7 +66,7 @@ struct ClipCard: View {
             Rectangle().fill(Color.black)
 
             if let poster {
-                Image(nsImage: poster)
+                Image(decorative: poster, scale: 1)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } else {
@@ -246,6 +246,6 @@ struct ClipCard: View {
 
     private func loadPoster() async {
         let image = await ThumbnailService.shared.image(for: clip, camera: previewCamera)
-        await MainActor.run { poster = image }
+        poster = image
     }
 }

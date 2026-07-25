@@ -6,7 +6,6 @@ struct LibraryView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var library: LibraryStore
     @Environment(\.appTheme) private var theme
-    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         ScrollView {
@@ -59,9 +58,7 @@ struct LibraryView: View {
                 .controlSize(.large)
                 .disabled(library.isScanning)
 
-                Button {
-                    openSettings()
-                } label: {
+                SettingsLink {
                     Label("Settings", systemImage: "gearshape")
                         .font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 6)

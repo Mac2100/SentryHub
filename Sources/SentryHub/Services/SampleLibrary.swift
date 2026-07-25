@@ -195,7 +195,7 @@ enum SampleLibrary {
             draw(into: pixelBuffer, camera: camera, progress: progress, date: stamp)
 
             let time = CMTime(value: CMTimeValue(frame), timescale: fps)
-            adaptor.append(pixelBuffer, withPresentationTime: time)
+            _ = adaptor.append(pixelBuffer, withPresentationTime: time)
         }
 
         input.markAsFinished()

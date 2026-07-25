@@ -73,7 +73,7 @@ struct RouteMiniMap: View {
                 }
                 .stroke(colors.grid, lineWidth: 0.75 * unit)
 
-                if points.count > 1, config.mapTrackStyle != .none {
+                if points.count > 1, config.mapTrackStyle != .hidden {
                     if config.mapTrackStyle == .full {
                         line(points)
                             .stroke(

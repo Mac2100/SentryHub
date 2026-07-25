@@ -279,7 +279,7 @@ struct MapSettingsPanel: View {
                         options: [
                             (MapTrackStyle.full, "ALL"),
                             (MapTrackStyle.traveled, "DRIVEN"),
-                            (MapTrackStyle.none, "OFF")
+                            (MapTrackStyle.hidden, "OFF")
                         ],
                         selection: $config.mapTrackStyle
                     )
