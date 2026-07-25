@@ -395,6 +395,7 @@ struct ExportSheet: View {
             clip: model.clip,
             telemetry: model.telemetry,
             config: config,
+            availability: model.availability,
             options: options,
             range: range,
             to: destination
@@ -411,6 +412,7 @@ struct ExportSheet: View {
                 clip: model.clip,
                 telemetry: model.telemetry,
                 config: config,
+                availability: model.availability,
                 layout: exportLayout,
                 focused: model.focusedCamera,
                 time: model.currentTime,

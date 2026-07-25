@@ -14,7 +14,7 @@ struct ContentView: View {
                 // A fresh player per clip: rebuilding is cheaper and safer than
                 // swapping every AVPlayer's item underneath the view.
                 .id(clip.id)
-            } else if appState.hasLibrary {
+            } else if appState.showsLibrary {
                 LibraryView(library: appState.library)
                     .transition(.opacity)
             } else {
@@ -71,55 +71,59 @@ struct WelcomeView: View {
             .frame(maxWidth: 800)
 
             HStack(spacing: 12) {
-                Button {
-                    Task { await appState.library.chooseFolder() }
-                } label: {
-                    Text("Choose Your TeslaCam Folder")
-                        .font(.headline)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 4)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(theme.primary)
-
-                Button {
-                    Task { await appState.library.loadSampleLibrary() }
-                } label: {
-                    HStack(spacing: 6) {
-                        if appState.library.isBuildingSample {
-                            ProgressView().controlSize(.small)
+                // The primary action is "get me to clips": choosing a folder
+                // when there isn't one, returning to the library when there is.
+                if appState.hasLibrary {
+                    Button {
+                        Task {
+                            await appState.library.chooseFolder()
+                            appState.showLibrary()
                         }
-                        Text("Load Sample")
+                    } label: {
+                        Text("Choose a Different Folder")
                             .font(.headline)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 4)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+
+                    Button {
+                        appState.showLibrary()
+                    } label: {
+                        Text("Back to Library")
+                            .font(.headline)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(theme.primary)
+                } else {
+                    Button {
+                        Task {
+                            await appState.library.chooseFolder()
+                            appState.showLibrary()
+                        }
+                    } label: {
+                        Text("Choose Your TeslaCam Folder")
+                            .font(.headline)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(theme.primary)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .disabled(appState.library.isBuildingSample)
             }
             .padding(.top, 36)
 
-            if appState.library.isBuildingSample {
-                VStack(spacing: 5) {
-                    ProgressView(value: appState.library.sampleProgress)
-                        .progressViewStyle(.linear)
-                        .tint(theme.primary)
-                        .frame(width: 260)
-                    Text("Generating sample footage… \(Int(appState.library.sampleProgress * 100))%")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                .padding(.top, 14)
-            } else {
-                Text("Pick the dashcam drive, its TeslaCam folder, or any folder of clips you copied off it.")
-                    .font(.callout)
-                    .foregroundStyle(.tertiary)
-                    .padding(.top, 10)
-            }
+            Text(appState.hasLibrary
+                 ? "\(appState.library.clips.count) clips loaded from \(appState.library.rootURL?.lastPathComponent ?? "your folder")."
+                 : "Pick the dashcam drive, its TeslaCam folder, or any folder of clips you copied off it.")
+                .font(.callout)
+                .foregroundStyle(.tertiary)
+                .padding(.top, 10)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -48,6 +48,17 @@ struct LibraryView: View {
                 Spacer(minLength: 16)
 
                 Button {
+                    appState.showStartScreen()
+                } label: {
+                    Label("Home", systemImage: "house")
+                        .font(.system(size: 12, weight: .medium))
+                        .padding(.horizontal, 6)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .help("Back to the start screen")
+
+                Button {
                     Task { await library.rescan() }
                 } label: {
                     Label("Rescan", systemImage: "arrow.clockwise")
@@ -151,35 +162,31 @@ struct LibraryView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                 }
 
-                HStack(spacing: 8) {
-                    Button {
-                        Task { await library.chooseFolder() }
-                    } label: {
-                        Label("Change Folder", systemImage: "folder")
-                            .font(.system(size: 12, weight: .semibold))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(theme.primary)
-
-                    Button {
-                        Task { await library.loadSampleLibrary() }
-                    } label: {
-                        Label("Load Sample", systemImage: "video.badge.plus")
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(library.isBuildingSample)
+                Button {
+                    Task { await library.chooseFolder() }
+                } label: {
+                    Label("Change Folder", systemImage: "folder")
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                        // Without this the label is the first thing the HStack
+                        // squeezes, and it renders as "Change Fol…".
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(theme.primary)
+                .fixedSize()
             }
             Spacer(minLength: 0)
         }
-        .frame(minWidth: 330, minHeight: 108)
+        .frame(minWidth: 260, minHeight: 108)
+        // Keeps the card from being the one that gives up space when the four
+        // stat cards compete for width.
+        .layoutPriority(1)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 13, style: .continuous)
@@ -192,7 +199,6 @@ struct LibraryView: View {
     }
 
     private var timelineSubtitle: String {
-        if library.isBuildingSample { return "Building the sample library…" }
         if library.isScanning { return "Scanning…" }
         if let date = library.timelineDate {
             return date.formatted(date: .long, time: .omitted)
@@ -208,9 +214,12 @@ struct LibraryView: View {
                 CountChip(
                     label: "All", symbol: "square.grid.2x2",
                     count: library.clips.count,
-                    isSelected: library.categoryFilter == nil,
+                    isSelected: library.categoryFilter == nil && library.triggerFilter == nil,
                     tint: theme.primary
-                ) { library.categoryFilter = nil }
+                ) {
+                    library.categoryFilter = nil
+                    library.triggerFilter = nil
+                }
 
                 ForEach(ClipCategory.allCases) { category in
                     CountChip(
@@ -219,21 +228,42 @@ struct LibraryView: View {
                         count: library.counts[category] ?? 0,
                         isSelected: library.categoryFilter == category,
                         tint: theme.primary
-                    ) { library.categoryFilter = category }
+                    ) {
+                        library.categoryFilter = category
+                        library.triggerFilter = nil
+                    }
+                }
+
+                // Why the car kept the clip, from event.json. Only kinds that
+                // actually appear in this library are offered.
+                if !library.availableTriggers.isEmpty {
+                    Divider().frame(height: 22)
+                    ForEach(library.availableTriggers) { trigger in
+                        CountChip(
+                            label: trigger.label,
+                            symbol: trigger.symbolName,
+                            count: library.triggerCount(trigger),
+                            isSelected: library.triggerFilter == trigger,
+                            tint: theme.primary
+                        ) {
+                            library.triggerFilter =
+                                library.triggerFilter == trigger ? nil : trigger
+                            library.categoryFilter = nil
+                        }
+                    }
                 }
                 Spacer()
             }
 
             HStack(spacing: 12) {
-                SearchField(text: $library.searchText, prompt: "Search by date, city or street")
+                SearchField(text: $library.searchText, prompt: "Search by city, street or event")
                     .frame(maxWidth: .infinity)
+
+                DateFilterControl(library: library, tint: theme.primary)
 
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.up.arrow.down")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text("Sort")
-                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                     Picker("", selection: $library.sortOrder) {
                         ForEach(LibrarySortOrder.allCases) { order in
@@ -286,10 +316,15 @@ struct LibraryView: View {
                     ProgressView().controlSize(.small)
                 }
                 Spacer()
-                if library.isUsingSampleLibrary {
-                    Label("Sample library", systemImage: "sparkles")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                if library.hasActiveFilters {
+                    Button {
+                        library.clearFilters()
+                    } label: {
+                        Label("Clear filters", systemImage: "xmark.circle")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                 }
             }
 
@@ -335,14 +370,120 @@ struct LibraryView: View {
                 Button("Choose Folder…") {
                     Task { await library.chooseFolder() }
                 }
-                Button("Load Sample") {
-                    Task { await library.loadSampleLibrary() }
+                if library.hasActiveFilters {
+                    Button("Clear Filters") { library.clearFilters() }
                 }
-                .disabled(library.isBuildingSample)
             }
             .controlSize(.large)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
+    }
+}
+
+
+/// Date filter: presets plus a real two-ended date picker, so a range can be
+/// chosen rather than typed into the search box.
+struct DateFilterControl: View {
+    @ObservedObject var library: LibraryStore
+    let tint: Color
+
+    @State private var isPresented = false
+
+    var body: some View {
+        Button {
+            isPresented.toggle()
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 11, weight: .medium))
+                Text(library.dateFilterLabel)
+                    .font(.system(size: 12, weight: library.isDateFiltered ? .semibold : .regular))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .background(
+                Capsule().fill(
+                    library.isDateFiltered ? tint.opacity(0.16) : Color.primary.opacity(0.04)
+                )
+            )
+            .overlay(
+                Capsule().strokeBorder(
+                    library.isDateFiltered ? tint.opacity(0.6) : Color.primary.opacity(0.08),
+                    lineWidth: 1
+                )
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(library.isDateFiltered ? Color.primary : Color.secondary)
+        .popover(isPresented: $isPresented, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(DateRangePreset.allCases) { preset in
+                    Button {
+                        library.datePreset = preset
+                        if preset != .custom { isPresented = false }
+                    } label: {
+                        HStack(spacing: 9) {
+                            Image(systemName: preset.symbolName)
+                                .font(.system(size: 11))
+                                .frame(width: 16)
+                                .foregroundStyle(.secondary)
+                            Text(preset.label)
+                                .font(.system(size: 13))
+                            Spacer()
+                            if library.datePreset == preset {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(tint)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if library.datePreset == .custom {
+                    Divider().padding(.vertical, 6)
+                    VStack(alignment: .leading, spacing: 8) {
+                        DatePicker(
+                            "From",
+                            selection: $library.customStart,
+                            in: ...Date(),
+                            displayedComponents: .date
+                        )
+                        DatePicker(
+                            "To",
+                            selection: $library.customEnd,
+                            in: ...Date(),
+                            displayedComponents: .date
+                        )
+                    }
+                    .datePickerStyle(.compact)
+                    .font(.system(size: 12))
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 4)
+                }
+
+                Divider().padding(.vertical, 6)
+                Button("Any date") {
+                    library.datePreset = .any
+                    isPresented = false
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
+            }
+            .padding(.top, 8)
+            .frame(width: 250)
+        }
     }
 }

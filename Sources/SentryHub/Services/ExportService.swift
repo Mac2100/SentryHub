@@ -118,6 +118,7 @@ final class ExportService: ObservableObject {
         clip: Clip,
         telemetry: TelemetryTrack,
         config: HUDConfiguration,
+        availability: TelemetryAvailability,
         options: Options,
         range: ClosedRange<TimeInterval>,
         to destination: URL
@@ -150,6 +151,7 @@ final class ExportService: ObservableObject {
                     clip: clip,
                     telemetry: telemetry,
                     config: config,
+                    availability: availability,
                     renderSize: renderSize,
                     start: start,
                     duration: outputDuration,
@@ -355,6 +357,7 @@ final class ExportService: ObservableObject {
         clip: Clip,
         telemetry: TelemetryTrack,
         config: HUDConfiguration,
+        availability: TelemetryAvailability,
         renderSize: CGSize,
         start: TimeInterval,
         duration: TimeInterval,
@@ -382,10 +385,11 @@ final class ExportService: ObservableObject {
                 size: renderSize,
                 config: exportConfig,
                 sample: telemetry.sample(at: clipTime),
-                wallClock: clip.startDate.addingTimeInterval(clipTime),
+                wallClock: clip.timelineStart.addingTimeInterval(clipTime),
                 city: clip.city,
                 route: route,
                 progress: clip.duration > 0 ? clipTime / clip.duration : 0,
+                availability: availability,
                 context: .export
             )
 
@@ -586,6 +590,7 @@ final class ExportService: ObservableObject {
         clip: Clip,
         telemetry: TelemetryTrack,
         config: HUDConfiguration,
+        availability: TelemetryAvailability,
         layout: CameraLayout,
         focused: CameraAngle,
         time: TimeInterval,
@@ -647,10 +652,11 @@ final class ExportService: ObservableObject {
                 size: renderSize,
                 config: exportConfig,
                 sample: telemetry.sample(at: time),
-                wallClock: clip.startDate.addingTimeInterval(time),
+                wallClock: clip.timelineStart.addingTimeInterval(time),
                 city: clip.city,
                 route: telemetry.route,
                 progress: clip.duration > 0 ? time / clip.duration : 0,
+                availability: availability,
                 context: .export
             )
             let renderer = ImageRenderer(content: canvas)

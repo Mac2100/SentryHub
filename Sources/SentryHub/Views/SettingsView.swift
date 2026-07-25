@@ -69,18 +69,6 @@ struct GeneralSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Sample Library") {
-                Button("Rebuild Sample Library") {
-                    Task { await appState.library.loadSampleLibrary(force: true) }
-                }
-                .disabled(appState.library.isBuildingSample)
-                if appState.library.isBuildingSample {
-                    ProgressView(value: appState.library.sampleProgress)
-                }
-                Text("Generates a two-segment, six-camera Sentry event plus a Recent clip, with demo telemetry driving both the picture and the HUD — so the player, map, and exporter can be tried without a dashcam drive.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
         }
         .formStyle(.grouped)
     }

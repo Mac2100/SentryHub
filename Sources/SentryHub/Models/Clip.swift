@@ -36,6 +36,68 @@ enum ClipCategory: String, CaseIterable, Identifiable, Codable, Hashable {
     }
 }
 
+
+/// What made the car keep this clip, read from `event.json`'s `reason`.
+///
+/// Tesla only writes three *folders* (Sentry / Saved / Recent), but Sentry and
+/// Saved events also record why they were captured — which is a far more useful
+/// thing to filter on than the folder alone.
+enum ClipTrigger: String, CaseIterable, Identifiable, Codable, Hashable {
+    case motion
+    case impact
+    case honk
+    case manualSave
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .motion: return "Motion"
+        case .impact: return "Impact"
+        case .honk: return "Honk"
+        case .manualSave: return "Saved by You"
+        }
+    }
+
+    /// Short form for the badge drawn on a clip card.
+    var badgeLabel: String {
+        switch self {
+        case .motion: return "MOTION"
+        case .impact: return "IMPACT"
+        case .honk: return "HONK"
+        case .manualSave: return "MANUAL"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .motion: return "figure.walk.motion"
+        case .impact: return "burst"
+        case .honk: return "speaker.wave.2.fill"
+        case .manualSave: return "hand.tap.fill"
+        }
+    }
+
+    /// Parses the strings Tesla has shipped over the years, e.g.
+    /// `sentry_aware_object_detection`, `sentry_aware_accel_v2`,
+    /// `user_interaction_honk`, `user_interaction_dashcam_icon_tapped`.
+    init?(reason: String?) {
+        guard let raw = reason?.lowercased(), !raw.isEmpty else { return nil }
+        if raw.contains("honk") {
+            self = .honk
+        } else if raw.contains("accel") || raw.contains("impact") || raw.contains("collision") {
+            self = .impact
+        } else if raw.hasPrefix("sentry") {
+            self = .motion
+        } else if raw.hasPrefix("user_interaction") || raw.contains("save")
+                    || raw.contains("tapped") {
+            self = .manualSave
+        } else {
+            return nil
+        }
+    }
+}
+
 // MARK: - Cameras
 
 /// The six camera feeds a Tesla can write. Older vehicles only produce four
@@ -267,6 +329,32 @@ struct Clip: Identifiable, Hashable {
     var orderedCameras: [CameraAngle] {
         let available = cameras
         return CameraAngle.sixUpOrder.filter { available.contains($0) }
+    }
+
+    /// Why the car saved this clip, when it said.
+    var trigger: ClipTrigger? {
+        ClipTrigger(reason: event?.reason)
+    }
+
+    /// Where the playable timeline actually begins.
+    ///
+    /// A Sentry folder is *named* for the moment of the event, but the footage
+    /// inside starts earlier — so the folder date is the wrong zero point for
+    /// the clock and for the event marker.
+    var timelineStart: Date {
+        segments.first?.timestamp ?? startDate
+    }
+
+    /// Offset of the triggering event along the timeline, when it falls inside
+    /// the recorded footage. This is what the timeline marker points at.
+    var eventOffset: TimeInterval? {
+        let moment = event?.timestamp ?? (segments.isEmpty ? nil : startDate)
+        guard let moment else { return nil }
+        let offset = moment.timeIntervalSince(timelineStart)
+        guard offset.isFinite, offset >= 0, duration > 0, offset <= duration + 1 else {
+            return nil
+        }
+        return min(offset, duration)
     }
 
     var coordinate: (latitude: Double, longitude: Double)? {

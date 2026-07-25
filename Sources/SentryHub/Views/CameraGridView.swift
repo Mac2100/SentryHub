@@ -162,6 +162,7 @@ struct CameraGridView: View {
                     city: model.clip.city,
                     route: model.telemetry.route,
                     progress: model.duration > 0 ? model.currentTime / model.duration : 0,
+                    availability: model.availability,
                     context: .live
                 )
             }

@@ -181,6 +181,10 @@ struct HUDConfiguration: Codable, Equatable {
     var speedDecimals: Int = 0
     var dateFormat: HUDDateFormat = .auto
 
+    /// Hide readouts the clip has no data for, instead of drawing them as `—`.
+    /// On by default so the overlay only shows what's genuinely known.
+    var autoHideUnavailable: Bool = true
+
     // Presentation
     var opacity: Double = 0.9
     var scale: Double = 1.0

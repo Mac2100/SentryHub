@@ -13,6 +13,10 @@ final class AppState: ObservableObject {
     /// The clip currently open in the player. `nil` shows the library.
     @Published var openClip: Clip?
 
+    /// Set when the user asks for the start screen from the library. Keeps the
+    /// chosen folder loaded so coming back is instant.
+    @Published private(set) var isShowingStartScreen = false
+
     private var cancellables: Set<AnyCancellable> = []
 
     private init() {
@@ -38,7 +42,17 @@ final class AppState: ObservableObject {
     }
 
     func open(_ clip: Clip) {
+        isShowingStartScreen = false
         openClip = clip
+    }
+
+    func showStartScreen() {
+        openClip = nil
+        isShowingStartScreen = true
+    }
+
+    func showLibrary() {
+        isShowingStartScreen = false
     }
 
     func closePlayer() {
@@ -47,4 +61,8 @@ final class AppState: ObservableObject {
 
     /// True once a folder has been picked — before that the welcome screen shows.
     var hasLibrary: Bool { library.rootURL != nil }
+
+    /// The library is shown when a folder is loaded and the user hasn't asked
+    /// to go back to the start screen.
+    var showsLibrary: Bool { hasLibrary && !isShowingStartScreen }
 }

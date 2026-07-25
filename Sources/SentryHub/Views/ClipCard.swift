@@ -78,6 +78,9 @@ struct ClipCard: View {
             VStack {
                 HStack(spacing: 6) {
                     categoryBadge
+                    if let trigger = clip.trigger {
+                        triggerBadge(trigger)
+                    }
                     durationChip
                     Spacer()
                 }
@@ -137,6 +140,30 @@ struct ClipCard: View {
         .background(Capsule().fill(badgeColor.opacity(0.85)))
     }
 
+    /// Why the car kept it — the same pill the library filters by.
+    private func triggerBadge(_ trigger: ClipTrigger) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: trigger.symbolName)
+                .font(.system(size: 9, weight: .semibold))
+            Text(trigger.badgeLabel)
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.8)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(triggerColor(trigger).opacity(0.85)))
+    }
+
+    private func triggerColor(_ trigger: ClipTrigger) -> Color {
+        switch trigger {
+        case .motion: return Color(red: 0.62, green: 0.42, blue: 0.10)
+        case .impact: return Color(red: 0.78, green: 0.22, blue: 0.14)
+        case .honk: return Color(red: 0.46, green: 0.30, blue: 0.72)
+        case .manualSave: return Color(red: 0.16, green: 0.46, blue: 0.44)
+        }
+    }
+
     private var badgeColor: Color {
         switch clip.category {
         case .sentry: return Color(red: 0.72, green: 0.14, blue: 0.25)
@@ -192,10 +219,6 @@ struct ClipCard: View {
                 )
             } else if let city = clip.city {
                 metaRow(symbol: "building.2", text: city)
-            }
-
-            if let reason = clip.event?.reasonLabel {
-                metaRow(symbol: "exclamationmark.bubble", text: reason)
             }
 
             HStack(spacing: 6) {

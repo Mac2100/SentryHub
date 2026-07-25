@@ -65,6 +65,8 @@ final class PlayerModel: ObservableObject {
     @Published var trimEnd: TimeInterval = 0
 
     @Published private(set) var telemetry: TelemetryTrack = .empty
+    /// Which HUD readouts this clip can actually feed.
+    @Published private(set) var availability: TelemetryAvailability = .clockOnly
 
     static let rateOptions: [Double] = [0.25, 0.5, 1, 1.5, 2, 4]
 
@@ -149,6 +151,7 @@ final class PlayerModel: ObservableObject {
 
         let loaded = await TelemetryLoader.load(for: clip)
         telemetry = loaded
+        availability = TelemetryAvailability(track: loaded, hasCity: clip.city != nil)
     }
 
     /// Stitches one camera's segments into a single continuous track.
@@ -362,9 +365,18 @@ final class PlayerModel: ObservableObject {
     }
 
     /// Wall-clock instant currently on screen — always available, because it
-    /// comes from the clip's own start time rather than from telemetry.
+    /// comes from the footage's own start time rather than from telemetry.
     var wallClock: Date {
-        clip.startDate.addingTimeInterval(currentTime)
+        clip.timelineStart.addingTimeInterval(currentTime)
+    }
+
+    /// Where the triggering event sits on the timeline, when it's inside the
+    /// recorded footage.
+    var eventOffset: TimeInterval? { clip.eventOffset }
+
+    func jumpToEvent() {
+        guard let eventOffset else { return }
+        seek(to: eventOffset)
     }
 
     func cycleFocus(forward: Bool) {

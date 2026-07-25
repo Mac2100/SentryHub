@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingRow<Control: View>: View {
     let symbol: String
     let label: String
+    var note: String?
     @ViewBuilder var control: () -> Control
 
     var body: some View {
@@ -17,10 +18,21 @@ struct SettingRow<Control: View>: View {
             Text(label)
                 .font(.system(size: 13))
                 .lineLimit(1)
+            if let note {
+                Text(note)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(
+                        Capsule().fill(Color.primary.opacity(0.06))
+                    )
+            }
             Spacer(minLength: 12)
             control()
         }
         .padding(.vertical, 5)
+        .opacity(note == nil ? 1 : 0.55)
     }
 }
 
@@ -28,9 +40,11 @@ struct SettingToggleRow: View {
     let symbol: String
     let label: String
     @Binding var isOn: Bool
+    /// Shown after the label, e.g. "no data" for a readout this clip can't feed.
+    var note: String?
 
     var body: some View {
-        SettingRow(symbol: symbol, label: label) {
+        SettingRow(symbol: symbol, label: label, note: note) {
             Toggle("", isOn: $isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
@@ -125,6 +139,8 @@ private struct PanelCaption: View {
 /// interface opacity / size sliders.
 struct HUDSettingsPanel: View {
     @Binding var config: HUDConfiguration
+    /// What the open clip can feed. `nil` in Settings, where no clip is loaded.
+    var availability: TelemetryAvailability?
 
     var body: some View {
         ScrollView {
@@ -135,12 +151,26 @@ struct HUDSettingsPanel: View {
                 .padding(.bottom, 6)
 
                 ForEach(HUDConfiguration.elementOrder) { element in
+                    let hasData = availability?.supports(elementID: element.id) ?? true
                     SettingToggleRow(
                         symbol: element.symbol,
                         label: element.label,
-                        isOn: binding(for: element.keyPath)
+                        isOn: binding(for: element.keyPath),
+                        note: hasData ? nil : "no data"
                     )
                 }
+
+                Divider().padding(.vertical, 8)
+
+                SettingToggleRow(
+                    symbol: "eye.slash",
+                    label: "Hide Empty Readouts",
+                    isOn: $config.autoHideUnavailable
+                )
+                Text("Keeps the overlay to what this clip actually knows, instead of drawing “—”.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.bottom, 4)
 
                 Divider().padding(.vertical, 8)
 
@@ -199,7 +229,7 @@ struct HUDSettingsPanel: View {
             }
             .padding(14)
         }
-        .frame(width: 300, height: 520)
+        .frame(width: 300, height: 560)
     }
 
     private func binding(for keyPath: WritableKeyPath<HUDConfiguration, Bool>) -> Binding<Bool> {

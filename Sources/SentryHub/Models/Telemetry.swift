@@ -82,8 +82,6 @@ enum TelemetrySource: String, Hashable {
     case embeddedVideoMetadata
     /// A user-supplied `telemetry.json` / `.csv` sidecar.
     case sidecarFile
-    /// The bundled demo library.
-    case sample
 
     var label: String {
         switch self {
@@ -91,7 +89,6 @@ enum TelemetrySource: String, Hashable {
         case .eventMetadata: return "event.json"
         case .embeddedVideoMetadata: return "Embedded in video"
         case .sidecarFile: return "Sidecar file"
-        case .sample: return "Sample data"
         }
     }
 
@@ -101,7 +98,6 @@ enum TelemetrySource: String, Hashable {
         case .eventMetadata: return "doc.text"
         case .embeddedVideoMetadata: return "film"
         case .sidecarFile: return "doc.badge.plus"
-        case .sample: return "sparkles"
         }
     }
 }
@@ -256,4 +252,66 @@ struct TelemetrySidecar: Decodable {
             }
         }
     }
+}
+
+// MARK: - Availability
+
+/// Which HUD readouts a clip can actually feed.
+///
+/// TeslaCam footage carries very little telemetry, so most elements have no
+/// data most of the time. The HUD uses this to hide readouts that would only
+/// ever show `—`, keeping the overlay to what's genuinely known.
+struct TelemetryAvailability: Equatable {
+    var speed = false
+    var gear = false
+    var autopilot = false
+    var pedals = false
+    var steering = false
+    var turnSignals = false
+    var gForce = false
+    var location = false
+    var heading = false
+
+    /// Date and time always work: they come from the clip's own start time plus
+    /// the play head, not from telemetry.
+    static let clockOnly = TelemetryAvailability()
+
+    init() {}
+
+    init(track: TelemetryTrack, hasCity: Bool = false) {
+        location = hasCity
+        for sample in track.samples {
+            if sample.speedMetersPerSecond != nil { speed = true }
+            if sample.gear != nil { gear = true }
+            if sample.autopilotState != nil { autopilot = true }
+            if sample.brake != nil || sample.accelerator != nil { pedals = true }
+            if sample.steeringAngle != nil { steering = true }
+            if sample.turnSignalLeft != nil || sample.turnSignalRight != nil { turnSignals = true }
+            if sample.accelerationLongitudinal != nil || sample.accelerationLateral != nil {
+                gForce = true
+            }
+            if sample.coordinate != nil { location = true }
+            if sample.heading != nil { heading = true }
+        }
+    }
+
+    /// Answers for the element rows in the HUD popover, keyed by their id.
+    func supports(elementID: String) -> Bool {
+        switch elementID {
+        case "speedometer": return speed
+        case "pedals": return pedals
+        case "steeringWheel": return steering
+        case "gearSelector": return gear
+        case "autopilot": return autopilot
+        case "gForce": return gForce
+        case "date", "time": return true
+        case "location": return location
+        case "turnSignals": return turnSignals
+        case "compass": return heading || location
+        default: return true
+        }
+    }
+
+    /// True when nothing beyond the clock is known.
+    var isClockOnly: Bool { self == .clockOnly }
 }
