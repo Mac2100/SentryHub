@@ -156,6 +156,8 @@ final class PlayerModel: ObservableObject {
         // buffer wrapped around a few seconds that matter.
         let opening = openingPosition
         if opening > 0 { seek(to: opening) }
+        // And start rolling: you opened a clip to watch it.
+        if Self.autoPlaysOnOpen { play() }
 
         let loaded = await TelemetryLoader.load(for: clip)
         telemetry = loaded
@@ -387,7 +389,7 @@ final class PlayerModel: ObservableObject {
     /// at the moment itself. Adjustable in Settings → Playback.
     static var eventPreRoll: TimeInterval {
         guard let stored = UserDefaults.standard.object(forKey: "eventPreRoll") as? Double else {
-            return 8
+            return 10
         }
         return min(max(stored, 0), 120)
     }
@@ -402,6 +404,12 @@ final class PlayerModel: ObservableObject {
             return 60
         }
         return min(max(stored, 0), 600)
+    }
+
+    /// Whether opening a clip starts it playing. On by default — you opened it
+    /// to watch it — but landing paused on a frame is a reasonable taste.
+    static var autoPlaysOnOpen: Bool {
+        UserDefaults.standard.object(forKey: "autoPlayOnOpen") as? Bool ?? true
     }
 
     /// Where playback should begin: a minute before the event when there is
@@ -441,7 +449,7 @@ final class PlayerModel: ObservableObject {
     }
 
     /// How far ahead of the event the trace lights up.
-    static let traceLeadIn: TimeInterval = 6
+    static let traceLeadIn: TimeInterval = 8
     /// And how long it lingers afterwards, so it doesn't snap off mid-incident.
     static let traceTail: TimeInterval = 4
 

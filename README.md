@@ -40,7 +40,8 @@ and exports a range to MP4 with the HUD burned in.
   says *where* a clip sits; a reason says *why* the car kept it, and they don't always agree — tap
   save during a Sentry event and the clip stays in `SentryClips`.
 
-  Plus a date filter with presets and a custom range picker, search over name, town, street, event,
+  Plus a date filter — Today, the last 7 or 30 days, or a custom range with a **time of day** on
+  each end, so "that Tuesday between 9pm and midnight" is one query. Search over name, town, street, event,
   and incident, sorting by date/category/length/size/name, three card densities, and a
   **Grid / List / Map** switch — the grid for recognising footage by sight, the list for scanning
   hundreds of clips by their facts in aligned columns, the map for pinning every GPS-tagged clip on
@@ -77,9 +78,10 @@ and exports a range to MP4 with the HUD burned in.
 - **Event focus** — Tesla wraps roughly ten minutes of buffer around a Sentry trigger, so the moment
   you opened the clip for is usually nine minutes in. A clip with a flagged moment therefore **opens
   a minute before it** rather than at 0:00, and the marker is reachable with one click or the `E`
-  key, landing **8 seconds early** so the lead-in is visible. Both distances are adjustable in
-  Settings → Playback, and clips with no event still open at the start. The camera that
-  saw it is traced with a pulsing highlight that lights up **six seconds before** the moment and
+  key, landing **10 seconds early** so the lead-in is visible. Both distances are adjustable in
+  Settings → Playback, and clips with no event still open at the start. A clip starts playing as
+  soon as it's ready, which can be turned off in the same place. The camera that
+  saw it is traced with a pulsing highlight that lights up **eight seconds before** the moment and
   fades once it has passed — but only for a **Sentry motion or impact**. A horn press or a
   manual save is the driver already knowing what happened, and a highlight shown on every clip is
   one nobody reads.
@@ -171,9 +173,9 @@ Those clips stay in the library — playable, searchable, and exportable — wit
 | `⇧←` `⇧→` | Jump five seconds |
 | `[` `]` | Set the trim in / out point |
 | `C` | Cycle the focused camera |
-| `F` | Maximise the picture |
+| `F` | Full screen — hides everything but the picture |
 | `E` | Jump to just before the event |
-| `Esc` | Back to the library |
+| `Esc` | Leave full screen, or the clip if you're not in it |
 | `⌘O` | Choose the TeslaCam folder |
 | `⌘R` | Rescan |
 | `⌘1` `⌘2` | Clips / Incidents tab |
@@ -218,6 +220,10 @@ An index SentryHub doesn't know simply singles out no tile.
 
 The clock in the HUD always works: it comes from the clip's own start time plus the play head, not
 from telemetry.
+
+**On time zones:** Tesla writes none — not in a file name, not in `event.json`. Every timestamp is
+therefore read in *this Mac's* time zone, which is what the date-and-time filter matches against.
+Footage shot in another zone will sit at the wrong hour.
 
 ### Sidecar schema
 
