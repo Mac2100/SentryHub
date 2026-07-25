@@ -23,15 +23,16 @@ struct ClipRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            if isSelecting || isSelected {
-                Button(action: onToggleSelection) {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(isSelected ? theme.primary : Color.secondary)
-                }
-                .buttonStyle(.plain)
-                .frame(width: 20)
+            // Always present, so the column never shifts and selection can be
+            // started from any row.
+            Button(action: onToggleSelection) {
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(isSelected ? theme.primary : Color.secondary)
             }
+            .buttonStyle(.plain)
+            .opacity(isSelected || isSelecting || isHovering ? 1 : 0.4)
+            .frame(width: 20)
 
             thumbnail
 
@@ -216,9 +217,7 @@ struct ClipListHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            if isSelecting {
-                Color.clear.frame(width: 20)
-            }
+            Color.clear.frame(width: 20)
             Color.clear.frame(width: thumbnailWidth, height: 1)
             caption("CLIP")
             Spacer(minLength: 8)
