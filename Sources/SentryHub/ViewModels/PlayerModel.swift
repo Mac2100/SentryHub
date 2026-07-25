@@ -42,7 +42,10 @@ enum CameraLayout: String, CaseIterable, Identifiable {
 /// drift check nudges any feed that slips.
 @MainActor
 final class PlayerModel: ObservableObject {
-    let clip: Clip
+    /// The scanner seeds every segment with Tesla's nominal 60 s length; `load()`
+    /// replaces that with the real durations before building any composition, so
+    /// short clips don't get a timeline padded with black.
+    @Published private(set) var clip: Clip
 
     @Published private(set) var players: [CameraAngle: AVPlayer] = [:]
     @Published private(set) var availableCameras: [CameraAngle] = []
@@ -91,6 +94,8 @@ final class PlayerModel: ObservableObject {
     func load() async {
         isLoading = true
         loadError = nil
+
+        clip = await LibraryScanner.resolveDurations(for: clip)
 
         let cameras = clip.orderedCameras
         guard !cameras.isEmpty else {
