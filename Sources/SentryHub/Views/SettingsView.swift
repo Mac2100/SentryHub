@@ -182,9 +182,10 @@ struct AppearanceSettingsView: View {
 struct PlaybackSettingsView: View {
     @AppStorage("defaultLayout") private var defaultLayout = CameraLayout.six.rawValue
     @AppStorage("galleryDensity") private var galleryDensity = GalleryDensity.regular.rawValue
-    @AppStorage("eventPreRoll") private var eventPreRoll = 8.0
+    @AppStorage("eventPreRoll") private var eventPreRoll = 10.0
     @AppStorage("openingLeadIn") private var openingLeadIn = 60.0
     @AppStorage("galleryGrouping") private var galleryGrouping = ClipGrouping.day.rawValue
+    @AppStorage("autoPlayOnOpen") private var autoPlayOnOpen = true
 
     var body: some View {
         Form {
@@ -205,6 +206,8 @@ struct PlaybackSettingsView: View {
             }
 
             Section {
+                Toggle("Start playing when a clip opens", isOn: $autoPlayOnOpen)
+
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("Open clips before the event")
@@ -242,8 +245,9 @@ struct PlaybackSettingsView: View {
                 shortcutRow("⇧ ← →", "Jump five seconds")
                 shortcutRow("[ / ]", "Set the trim in / out point")
                 shortcutRow("C", "Cycle the focused camera")
-                shortcutRow("F", "Maximise the picture")
-                shortcutRow("Esc", "Back to the library")
+                shortcutRow("E", "Jump to just before the event")
+                shortcutRow("F", "Full screen — hides everything but the picture")
+                shortcutRow("Esc", "Leave full screen, or the clip if you're not in it")
             }
         }
         .formStyle(.grouped)

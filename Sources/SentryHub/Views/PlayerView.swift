@@ -18,6 +18,7 @@ struct PlayerView: View {
     @State private var showExportSheet = false
     @State private var mapPanelTab = MapPanelTab.route
     @State private var wasPlayingBeforeScrub = false
+    @State private var showsFullScreenHint = false
 
     private enum MapPanelTab: String, CaseIterable, Identifiable {
         case route, settings
@@ -61,9 +62,34 @@ struct PlayerView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            transportBar
+            // Full screen means the picture and nothing else. Space, the arrow
+            // keys, E and F all still work, and F or Esc brings the chrome back.
+            if !model.isFullScreen {
+                transportBar
+            }
         }
         .background(playerBackdrop)
+        // With the transport bar gone, the way back out needs saying once.
+        .overlay(alignment: .top) {
+            if model.isFullScreen, showsFullScreenHint {
+                Text("Esc or F to leave full screen")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.black.opacity(0.55)))
+                    .padding(.top, 16)
+                    .transition(.opacity)
+            }
+        }
+        .onChange(of: model.isFullScreen) { _, isFull in
+            showsFullScreenHint = isFull
+        }
+        .task(id: showsFullScreenHint) {
+            guard showsFullScreenHint else { return }
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            withAnimation(.easeOut(duration: 0.4)) { showsFullScreenHint = false }
+        }
         .task {
             await model.load()
             await model.refreshMapBackdrop(config: hudStore.config)
@@ -368,7 +394,7 @@ struct PlayerView: View {
                 // What the button *does*, not what the clip is — the badge on
                 // the card already names the event kind.
                 Label(
-                    "Jump to",
+                    "Jump to Event",
                     systemImage: model.clip.trigger?.symbolName ?? "diamond.fill"
                 )
                 .font(.system(size: 11, weight: .semibold))
@@ -496,8 +522,16 @@ struct PlayerView: View {
                 .keyboardShortcut("f", modifiers: [])
             Button("") { model.jumpToEvent() }
                 .keyboardShortcut("e", modifiers: [])
-            Button("") { onClose() }
-                .keyboardShortcut(.escape, modifiers: [])
+            Button("") {
+                // One key, two jobs, in the order you'd expect: leave full
+                // screen if you're in it, otherwise leave the clip.
+                if model.isFullScreen {
+                    model.isFullScreen = false
+                } else {
+                    onClose()
+                }
+            }
+            .keyboardShortcut(.escape, modifiers: [])
         }
         .opacity(0)
         .allowsHitTesting(false)

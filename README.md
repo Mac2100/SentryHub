@@ -77,9 +77,10 @@ and exports a range to MP4 with the HUD burned in.
 - **Event focus** — Tesla wraps roughly ten minutes of buffer around a Sentry trigger, so the moment
   you opened the clip for is usually nine minutes in. A clip with a flagged moment therefore **opens
   a minute before it** rather than at 0:00, and the marker is reachable with one click or the `E`
-  key, landing **8 seconds early** so the lead-in is visible. Both distances are adjustable in
-  Settings → Playback, and clips with no event still open at the start. The camera that
-  saw it is traced with a pulsing highlight that lights up **six seconds before** the moment and
+  key, landing **10 seconds early** so the lead-in is visible. Both distances are adjustable in
+  Settings → Playback, and clips with no event still open at the start. A clip starts playing as
+  soon as it's ready, which can be turned off in the same place. The camera that
+  saw it is traced with a pulsing highlight that lights up **eight seconds before** the moment and
   fades once it has passed — but only for a **Sentry motion or impact**. A horn press or a
   manual save is the driver already knowing what happened, and a highlight shown on every clip is
   one nobody reads.
@@ -171,9 +172,9 @@ Those clips stay in the library — playable, searchable, and exportable — wit
 | `⇧←` `⇧→` | Jump five seconds |
 | `[` `]` | Set the trim in / out point |
 | `C` | Cycle the focused camera |
-| `F` | Maximise the picture |
+| `F` | Full screen — hides everything but the picture |
 | `E` | Jump to just before the event |
-| `Esc` | Back to the library |
+| `Esc` | Leave full screen, or the clip if you're not in it |
 | `⌘O` | Choose the TeslaCam folder |
 | `⌘R` | Rescan |
 | `⌘1` `⌘2` | Clips / Incidents tab |
