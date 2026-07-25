@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 
@@ -142,8 +143,18 @@ final class LibraryStore: ObservableObject {
     @Published var customEnd: Date = Date()
 
     private var durationTask: Task<Void, Never>?
+    private var labelObserver: AnyCancellable?
 
     init() {
+        // Renaming a clip changes what search matches on, and SwiftUI only
+        // watches the object a view declared — so pass the label store's
+        // notifications on as our own.
+        labelObserver = ClipLabels.shared.objectWillChange.sink { [weak self] _ in
+            // ClipLabels is @MainActor, so this always arrives on the main actor.
+            MainActor.assumeIsolated {
+                self?.objectWillChange.send()
+            }
+        }
         if let stored = UserDefaults.standard.string(forKey: "galleryDensity"),
            let value = GalleryDensity(rawValue: stored) {
             density = value
@@ -338,6 +349,8 @@ final class LibraryStore: ObservableObject {
         if !query.isEmpty {
             result = result.filter { clip in
                 if clip.name.lowercased().contains(query) { return true }
+                if let label = ClipLabels.shared.label(for: clip)?.lowercased(),
+                   label.contains(query) { return true }
                 if let city = clip.city?.lowercased(), city.contains(query) { return true }
                 if let reason = clip.event?.reasonLabel?.lowercased(), reason.contains(query) {
                     return true

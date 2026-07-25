@@ -8,9 +8,13 @@ struct ClipCard: View {
     let onOpen: () -> Void
 
     @Environment(\.appTheme) private var theme
+    @ObservedObject private var labels = ClipLabels.shared
     @State private var poster: CGImage?
     @State private var previewCamera: CameraAngle?
     @State private var isHovering = false
+    @State private var isRenaming = false
+    @State private var draftName = ""
+    @FocusState private var nameFieldFocused: Bool
 
     private var cameras: [CameraAngle] { clip.orderedCameras }
 
@@ -39,12 +43,21 @@ struct ClipCard: View {
                 )
         )
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .onTapGesture(perform: onOpen)
+        .onTapGesture {
+            if isRenaming { commitRename() } else { onOpen() }
+        }
         .onHover { isHovering = $0 }
         .animation(.easeOut(duration: 0.15), value: isHovering)
         .task(id: previewCamera) { await loadPoster() }
         .contextMenu {
             Button("Open in Player", action: onOpen)
+            Button("Rename…", action: beginRename)
+            if labels.label(for: clip) != nil {
+                Button("Restore Original Name") {
+                    labels.set(nil, for: clip)
+                }
+            }
+            Divider()
             Button("Reveal in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([clip.directory])
             }
@@ -227,10 +240,7 @@ struct ClipCard: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline) {
-                Text(clip.name)
-                    .font(.system(size: density == .compact ? 14 : 17, weight: .semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                title
                 Spacer(minLength: 8)
                 Text("\(cameras.count) camera\(cameras.count == 1 ? "" : "s")")
                     .font(.system(size: 10, weight: .medium))
@@ -241,36 +251,99 @@ struct ClipCard: View {
                     .fixedSize()
             }
 
-            Text(clip.startDate.formatted(date: .long, time: .omitted))
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
             metaRow(
                 symbol: "calendar",
-                text: "\(clip.startDate.formatted(.dateTime.month(.abbreviated).day())) · \(clip.startDate.formatted(date: .omitted, time: .shortened))"
+                text: "\(clip.startDate.formatted(.dateTime.month(.abbreviated).day().year())) · \(clip.startDate.formatted(date: .omitted, time: .shortened))"
             )
 
-            if let coordinate = clip.coordinate {
-                metaRow(
-                    symbol: "mappin.and.ellipse",
-                    text: Format.coordinate(
-                        latitude: coordinate.latitude, longitude: coordinate.longitude
-                    )
-                )
-            } else if let city = clip.city {
+            // Where it happened, in words. The coordinates behind it are still
+            // one right-click away, and the map view plots the pin.
+            if let city = clip.city {
                 metaRow(symbol: "building.2", text: city)
+                    .help(coordinateText ?? city)
             }
 
             HStack(spacing: 6) {
                 infoChip(Format.bytes(clip.byteCount))
-                infoChip(clip.name)
-                    .lineLimit(1)
+                categoryPill
             }
             .padding(.top, 2)
         }
         .padding(.horizontal, 14)
         .padding(.top, 12)
         .padding(.bottom, 14)
+    }
+
+    /// Click to rename. The label is ours alone — see `ClipLabels`.
+    private var title: some View {
+        Group {
+            if isRenaming {
+                TextField("Name", text: $draftName)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: density == .compact ? 14 : 17, weight: .semibold))
+                    .focused($nameFieldFocused)
+                    .onSubmit(commitRename)
+                    .onExitCommand { isRenaming = false }
+                    .onChange(of: nameFieldFocused) { _, focused in
+                        // Clicking away keeps what was typed rather than
+                        // silently throwing it out.
+                        if !focused, isRenaming { commitRename() }
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.primary.opacity(0.07))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(theme.primary.opacity(0.6), lineWidth: 1)
+                    )
+            } else {
+                Button(action: beginRename) {
+                    HStack(spacing: 5) {
+                        Text(labels.title(for: clip))
+                            .font(.system(size: density == .compact ? 14 : 17, weight: .semibold))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        if isHovering {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .help("Click to rename — the files on the drive keep their own name")
+            }
+        }
+    }
+
+    private var categoryPill: some View {
+        HStack(spacing: 4) {
+            Image(systemName: clip.category.symbolName)
+                .font(.system(size: 9, weight: .semibold))
+            Text(clip.category.label)
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .foregroundStyle(badgeColor)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(badgeColor.opacity(0.14))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(badgeColor.opacity(0.35), lineWidth: 1)
+        )
+    }
+
+    private var coordinateText: String? {
+        guard let coordinate = clip.coordinate else { return nil }
+        return Format.coordinate(
+            latitude: coordinate.latitude, longitude: coordinate.longitude
+        )
     }
 
     private func metaRow(symbol: String, text: String) -> some View {
@@ -299,6 +372,17 @@ struct ClipCard: View {
     }
 
     // MARK: - Behaviour
+
+    private func beginRename() {
+        draftName = labels.title(for: clip)
+        isRenaming = true
+        nameFieldFocused = true
+    }
+
+    private func commitRename() {
+        labels.set(draftName, for: clip)
+        isRenaming = false
+    }
 
     private func advancePreview() {
         guard !cameras.isEmpty else { return }

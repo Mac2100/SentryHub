@@ -10,6 +10,7 @@ struct PlayerView: View {
 
     @StateObject private var model: PlayerModel
     @EnvironmentObject private var hudStore: HUDStore
+    @ObservedObject private var labels = ClipLabels.shared
     @Environment(\.appTheme) private var theme
 
     @State private var showHUDPanel = false
@@ -110,7 +111,7 @@ struct PlayerView: View {
             .controlSize(.large)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(clip.name)
+                Text(labels.title(for: clip))
                     .font(.system(size: 17, weight: .semibold))
                 HStack(spacing: 14) {
                     headerFact(symbol: "clock", text: clip.startDate.briefFormatted)

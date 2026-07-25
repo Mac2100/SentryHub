@@ -20,7 +20,9 @@ MP4 with the HUD burned in.
   sorting by date/category/length/size/name, three card densities, and a **Grid / Map** switch that pins
   every GPS-tagged clip on a real map. The gallery is sectioned — by day, event kind, or folder —
   with sticky headers (chosen in Settings → Playback), because a real drive is hundreds of cards. Each card leads with what
-  happened (Motion / Impact / Honk / Manual) and carries its folder as a secondary chip.
+  happened (Motion / Impact / Honk / Manual), shows the date, time, town, size, and folder,
+  and can be **renamed** by clicking its title — the label is stored in the app, so the
+  timestamped files on the drive keep the names the car gave them.
 - **Synchronised multi-camera playback** — up to six feeds (front, rear, both repeaters, both
   B-pillars) each backed by its own `AVPlayer`, started at a shared host time and drift-corrected
   every two seconds. A Sentry event's ~60-second segments are stitched into one continuous
