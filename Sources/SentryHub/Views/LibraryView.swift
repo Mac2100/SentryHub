@@ -221,7 +221,8 @@ struct LibraryView: View {
                     library.triggerFilter = nil
                 }
 
-                ForEach(ClipCategory.allCases) { category in
+                // Folders you or the car chose to keep.
+                ForEach(LibraryStore.leadingCategories) { category in
                     CountChip(
                         label: category.label,
                         symbol: category.symbolName,
@@ -234,22 +235,34 @@ struct LibraryView: View {
                     }
                 }
 
+                Divider().frame(height: 22)
+
+                // Sentry sits on this side of the divider with the reasons it
+                // fired, because that's the folder those clips come from.
+                CountChip(
+                    label: ClipCategory.sentry.label,
+                    symbol: ClipCategory.sentry.symbolName,
+                    count: library.counts[.sentry] ?? 0,
+                    isSelected: library.categoryFilter == .sentry,
+                    tint: theme.primary
+                ) {
+                    library.categoryFilter = .sentry
+                    library.triggerFilter = nil
+                }
+
                 // Why the car kept the clip, from event.json. Only kinds that
                 // actually appear in this library are offered.
-                if !library.availableTriggers.isEmpty {
-                    Divider().frame(height: 22)
-                    ForEach(library.availableTriggers) { trigger in
-                        CountChip(
-                            label: trigger.label,
-                            symbol: trigger.symbolName,
-                            count: library.triggerCount(trigger),
-                            isSelected: library.triggerFilter == trigger,
-                            tint: theme.primary
-                        ) {
-                            library.triggerFilter =
-                                library.triggerFilter == trigger ? nil : trigger
-                            library.categoryFilter = nil
-                        }
+                ForEach(library.availableTriggers) { trigger in
+                    CountChip(
+                        label: trigger.label,
+                        symbol: trigger.symbolName,
+                        count: library.triggerCount(trigger),
+                        isSelected: library.triggerFilter == trigger,
+                        tint: theme.primary
+                    ) {
+                        library.triggerFilter =
+                            library.triggerFilter == trigger ? nil : trigger
+                        library.categoryFilter = nil
                     }
                 }
                 Spacer()
@@ -312,7 +325,7 @@ struct LibraryView: View {
             HStack(spacing: 8) {
                 Text("Showing \(library.filteredClips.count) clip\(library.filteredClips.count == 1 ? "" : "s")")
                     .font(.system(size: 14, weight: .medium))
-                if library.grouping != .none, library.groups.count > 1 {
+                if library.effectiveGrouping != .none, library.groups.count > 1 {
                     Text("in \(library.groups.count) groups")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)

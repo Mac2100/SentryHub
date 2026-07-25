@@ -245,11 +245,20 @@ final class LibraryStore: ObservableObject {
         return result
     }
 
-    /// Trigger kinds actually present, so no empty pills are offered.
+    /// Trigger kinds actually present, so no empty pills are offered. Ordered
+    /// most-common-first rather than by declaration order.
     var availableTriggers: [ClipTrigger] {
         let present = Set(clips.compactMap(\.trigger))
-        return ClipTrigger.allCases.filter { present.contains($0) }
+        return Self.triggerDisplayOrder.filter { present.contains($0) }
     }
+
+    private static let triggerDisplayOrder: [ClipTrigger] = [
+        .motion, .honk, .impact, .manualSave
+    ]
+
+    /// Folder chips shown ahead of the divider. Sentry sits with the event
+    /// kinds on the other side, because that's where its clips come from.
+    static let leadingCategories: [ClipCategory] = [.recent, .saved]
 
     func triggerCount(_ trigger: ClipTrigger) -> Int {
         clips.filter { $0.trigger == trigger }.count
@@ -397,17 +406,28 @@ final class LibraryStore: ObservableObject {
 
     // MARK: - Grouping
 
+    /// Day sections only make sense while the list is in date order — sorting
+    /// by size or length inside per-day buckets looks like the sort did
+    /// nothing. Any other sort collapses the gallery to one section so the
+    /// ordering is global and visible.
+    var effectiveGrouping: ClipGrouping {
+        sortOrder == .date ? grouping : .none
+    }
+
     /// The filtered clips broken into sections. A drive's worth of Sentry
     /// events is hundreds of cards; sections make that scannable.
     var groups: [ClipGroup] {
         let clips = filteredClips
         guard !clips.isEmpty else { return [] }
 
-        switch grouping {
+        switch effectiveGrouping {
         case .none:
             return [ClipGroup(
-                id: "all", title: "All Clips", subtitle: nil,
-                symbolName: "square.grid.2x2", clips: clips
+                id: "all",
+                title: sortOrder == .date ? "All Clips" : "Sorted by \(sortOrder.label)",
+                subtitle: Self.groupSubtitle(clips),
+                symbolName: sortOrder == .date ? "square.grid.2x2" : "arrow.up.arrow.down",
+                clips: clips
             )]
 
         case .day:
@@ -422,7 +442,7 @@ final class LibraryStore: ObservableObject {
                     title: Self.dayTitle(day, calendar: calendar),
                     subtitle: Self.groupSubtitle(items),
                     symbolName: "calendar",
-                    clips: items.sorted { $0.startDate > $1.startDate }
+                    clips: items
                 )
             }
 
@@ -436,7 +456,7 @@ final class LibraryStore: ObservableObject {
                     title: trigger?.label ?? "No Event Recorded",
                     subtitle: Self.groupSubtitle(items),
                     symbolName: trigger?.symbolName ?? "questionmark.circle",
-                    clips: items.sorted { $0.startDate > $1.startDate }
+                    clips: items
                 )
             }
 
@@ -449,7 +469,7 @@ final class LibraryStore: ObservableObject {
                     title: category.label,
                     subtitle: Self.groupSubtitle(items),
                     symbolName: category.symbolName,
-                    clips: items.sorted { $0.startDate > $1.startDate }
+                    clips: items
                 )
             }
         }
