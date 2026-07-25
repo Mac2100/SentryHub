@@ -379,9 +379,15 @@ final class PlayerModel: ObservableObject {
     /// recorded footage.
     var eventOffset: TimeInterval? { clip.eventOffset }
 
-    /// Seconds of run-up given when jumping to the event, so the lead-in is
-    /// visible rather than starting at the moment itself.
-    static let eventPreRoll: TimeInterval = 5
+    /// Seconds of run-up given when jumping to *any* event — motion, impact,
+    /// horn, or a manual save — so the lead-in is visible rather than starting
+    /// at the moment itself. Adjustable in Settings → Playback.
+    static var eventPreRoll: TimeInterval {
+        guard let stored = UserDefaults.standard.object(forKey: "eventPreRoll") as? Double else {
+            return 5
+        }
+        return min(max(stored, 0), 30)
+    }
 
     func jumpToEvent() {
         guard let eventOffset else { return }

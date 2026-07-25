@@ -351,11 +351,19 @@ struct Clip: Identifiable, Hashable {
         let moment = event?.timestamp ?? (segments.isEmpty ? nil : startDate)
         guard let moment else { return nil }
         let offset = moment.timeIntervalSince(timelineStart)
-        guard offset.isFinite, offset >= 0, duration > 0, offset <= duration + 1 else {
-            return nil
-        }
-        return min(offset, duration)
+        guard offset.isFinite, duration > 0 else { return nil }
+        // The car names a Sentry folder for the moment of the event, but the
+        // last segment is often cut short — so the stamp can sit a little past
+        // the final frame. Clamp generously rather than dropping the marker,
+        // which would take the jump button with it.
+        guard offset >= -Self.eventStampTolerance,
+              offset <= duration + Self.eventStampTolerance else { return nil }
+        return min(max(offset, 0), duration)
     }
+
+    /// How far outside the footage an `event.json` stamp may sit and still be
+    /// treated as "this clip's event".
+    private static let eventStampTolerance: TimeInterval = 30
 
     var coordinate: (latitude: Double, longitude: Double)? {
         guard let event, let lat = event.latitude, let lon = event.longitude,

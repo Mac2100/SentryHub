@@ -41,8 +41,8 @@ MP4 with the HUD burned in.
   The HUD is rendered by the *same* SwiftUI view the player uses, so exports are WYSIWYG. Also
   exports the current frame as a PNG.
 - **Event focus** — the moment the car flagged (Sentry trigger, horn, manual save) is marked on the
-  timeline and reachable with one click or the `E` key, landing five seconds early so the lead-in is
-  visible. The camera that saw it is traced with a pulsing highlight that quickens as the play head
+  timeline and reachable with one click or the `E` key, landing a few seconds early — for any event
+  kind — so the lead-in is visible; the run-up is adjustable in Settings → Playback. The camera that saw it is traced with a pulsing highlight that quickens as the play head
   closes in, and the HUD flashes what happened as it passes.
 - **Themes & appearance** — six accent themes and a System/Light/Dark override.
 - **One-click updates** — an optional launch check against GitHub Releases; installing downloads
@@ -100,7 +100,7 @@ The chosen folder is remembered between launches. Click any card to open the pla
 | `[` `]` | Set the trim in / out point |
 | `C` | Cycle the focused camera |
 | `F` | Maximise the picture |
-| `E` | Jump to five seconds before the event |
+| `E` | Jump to just before the event |
 | `Esc` | Back to the library |
 | `⌘O` | Choose the TeslaCam folder |
 | `⌘R` | Rescan |
