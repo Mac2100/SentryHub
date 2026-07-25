@@ -800,14 +800,24 @@ struct DateFilterControl: View {
                             "From",
                             selection: $library.customStart,
                             in: ...Date(),
-                            displayedComponents: .date
+                            displayedComponents: [.date, .hourAndMinute]
                         )
                         DatePicker(
                             "To",
                             selection: $library.customEnd,
                             in: ...Date(),
-                            displayedComponents: .date
+                            displayedComponents: [.date, .hourAndMinute]
                         )
+
+                        // Tesla writes no time zone anywhere — not in a file
+                        // name, not in event.json — so every clip's time is
+                        // read in this Mac's. Footage shot in another zone
+                        // will sit at the wrong hour, and it's better to say
+                        // so than to let someone wonder.
+                        Text("Times are this Mac's local time, which is how the car's timestamps are read.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .datePickerStyle(.compact)
                     .font(.system(size: 12))

@@ -265,9 +265,9 @@ final class LibraryStore: ObservableObject {
 
     // Date filter
     @Published var datePreset: DateRangePreset = .any
-    @Published var customStart: Date = Calendar.current.date(
-        byAdding: .day, value: -7, to: Date()
-    ) ?? Date()
+    @Published var customStart: Date = Calendar.current.startOfDay(
+        for: Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+    )
     @Published var customEnd: Date = Date()
 
     // Multi-select
@@ -562,22 +562,39 @@ final class LibraryStore: ObservableObject {
             let start = calendar.date(byAdding: .day, value: -30, to: calendar.startOfDay(for: now))
             return DateInterval(start: start ?? now, end: now)
         case .custom:
-            let start = calendar.startOfDay(for: min(customStart, customEnd))
-            let end = calendar.date(
-                byAdding: .day, value: 1, to: calendar.startOfDay(for: max(customStart, customEnd))
-            ) ?? max(customStart, customEnd)
-            return DateInterval(start: start, end: end)
+            let start = min(customStart, customEnd)
+            var end = max(customStart, customEnd)
+            // Picking the same day in both fields gives a zero-length range,
+            // which matches nothing — read that as "all of that day" instead.
+            if end <= start {
+                end = calendar.date(
+                    bySettingHour: 23, minute: 59, second: 59, of: end
+                ) ?? end
+            }
+            return DateInterval(start: start, end: max(end, start))
         }
     }
 
     /// Label for the date-filter button.
     var dateFilterLabel: String {
         guard datePreset == .custom else { return datePreset.label }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
         let a = min(customStart, customEnd)
         let b = max(customStart, customEnd)
+        // Only spell out the times when they've been moved off midnight —
+        // otherwise a plain day range reads as one.
+        let formatter = DateFormatter()
+        formatter.dateFormat = customUsesTimeOfDay ? "MMM d, HH:mm" : "MMM d"
         return "\(formatter.string(from: a)) – \(formatter.string(from: b))"
+    }
+
+    /// True once either end of the custom range carries a time of day.
+    var customUsesTimeOfDay: Bool {
+        let calendar = Calendar.current
+        for date in [customStart, customEnd] {
+            let parts = calendar.dateComponents([.hour, .minute], from: date)
+            if (parts.hour ?? 0) != 0 || (parts.minute ?? 0) != 0 { return true }
+        }
+        return false
     }
 
     var isDateFiltered: Bool { datePreset != .any }

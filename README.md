@@ -40,7 +40,8 @@ and exports a range to MP4 with the HUD burned in.
   says *where* a clip sits; a reason says *why* the car kept it, and they don't always agree — tap
   save during a Sentry event and the clip stays in `SentryClips`.
 
-  Plus a date filter with presets and a custom range picker, search over name, town, street, event,
+  Plus a date filter — Today, the last 7 or 30 days, or a custom range with a **time of day** on
+  each end, so "that Tuesday between 9pm and midnight" is one query. Search over name, town, street, event,
   and incident, sorting by date/category/length/size/name, three card densities, and a
   **Grid / List / Map** switch — the grid for recognising footage by sight, the list for scanning
   hundreds of clips by their facts in aligned columns, the map for pinning every GPS-tagged clip on
@@ -219,6 +220,10 @@ An index SentryHub doesn't know simply singles out no tile.
 
 The clock in the HUD always works: it comes from the clip's own start time plus the play head, not
 from telemetry.
+
+**On time zones:** Tesla writes none — not in a file name, not in `event.json`. Every timestamp is
+therefore read in *this Mac's* time zone, which is what the date-and-time filter matches against.
+Footage shot in another zone will sit at the wrong hour.
 
 ### Sidecar schema
 
