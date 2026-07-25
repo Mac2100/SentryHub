@@ -271,6 +271,8 @@ struct TelemetryAvailability: Equatable {
     var gForce = false
     var location = false
     var heading = false
+    /// The clip records a triggering event inside its footage.
+    var event = false
 
     /// Date and time always work: they come from the clip's own start time plus
     /// the play head, not from telemetry.
@@ -278,8 +280,9 @@ struct TelemetryAvailability: Equatable {
 
     init() {}
 
-    init(track: TelemetryTrack, hasCity: Bool = false) {
+    init(track: TelemetryTrack, hasCity: Bool = false, hasEvent: Bool = false) {
         location = hasCity
+        event = hasEvent
         for sample in track.samples {
             if sample.speedMetersPerSecond != nil { speed = true }
             if sample.gear != nil { gear = true }
@@ -308,6 +311,7 @@ struct TelemetryAvailability: Equatable {
         case "location": return location
         case "turnSignals": return turnSignals
         case "compass": return heading || location
+        case "eventFlash": return event
         default: return true
         }
     }
