@@ -74,9 +74,11 @@ and exports a range to MP4 with the HUD burned in.
 - **Trim & export** — set IN and OUT points on the timeline, then export the current grid to MP4.
   The HUD is rendered by the *same* SwiftUI view the player uses, so exports are WYSIWYG. Also
   exports the current frame as a PNG.
-- **Event focus** — the moment the car flagged (Sentry trigger, horn, manual save) is marked on the
-  timeline and reachable with one click or the `E` key, landing a few seconds early — for any event
-  kind — so the lead-in is visible; the run-up is adjustable in Settings → Playback. The camera that
+- **Event focus** — Tesla wraps roughly ten minutes of buffer around a Sentry trigger, so the moment
+  you opened the clip for is usually nine minutes in. A clip with a flagged moment therefore **opens
+  a minute before it** rather than at 0:00, and the marker is reachable with one click or the `E`
+  key, landing **20 seconds early** so the lead-in is visible. Both distances are adjustable in
+  Settings → Playback, and clips with no event still open at the start. The camera that
   saw it is traced with a pulsing highlight that quickens as the play head closes in — but only for
   a **Sentry motion or impact**, and only in the seconds around the event itself. A horn press or a
   manual save is the driver already knowing what happened, and a highlight shown on every clip is
@@ -202,6 +204,11 @@ it never invents numbers:
 2. **Metadata embedded in the MP4** — a timed metadata track or an ISO-6709 location atom, both
    read when the firmware wrote them.
 3. **`event.json`** — one static fix, enough to place the map pin.
+
+The `camera` index in `event.json` is the car's own camera enumeration, not the order TeslaCam
+writes files in: `0`–`2` all look forward, `3`/`4` are the B-pillars, `5`/`6` the repeaters, `7` the
+rear. Index 6 is confirmed against a real event whose subject appears first on the right repeater.
+An index SentryHub doesn't know simply singles out no tile.
 
 The clock in the HUD always works: it comes from the clip's own start time plus the play head, not
 from telemetry.

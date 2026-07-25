@@ -293,15 +293,25 @@ struct EventMetadata: Codable, Hashable {
         return nil
     }
 
-    /// Tesla's `camera` field is an index, not a name.
+    /// Tesla's `camera` field is an index into the car's own camera
+    /// enumeration, not a name — and not the order TeslaCam writes files in.
+    ///
+    /// The forward trio (main, fisheye, narrow) all look ahead and TeslaCam
+    /// only ever writes one `-front.mp4`, so they collapse to the same angle.
+    /// The cabin camera is never written to a dashcam clip.
+    ///
+    /// Index 6 is confirmed against a real `sentry_aware_object_detection`
+    /// event whose subject appears first on the right repeater; the rest
+    /// follow that same enumeration. An unknown index returns nil rather than
+    /// guessing, which just means no tile is singled out.
     private static func camera(forTeslaIndex index: Int) -> CameraAngle? {
         switch index {
-        case 0: return .front
-        case 1: return .rightRepeater
-        case 2: return .leftRepeater
-        case 3: return .rightPillar
-        case 4: return .leftPillar
-        case 5, 6: return .back
+        case 0, 1, 2: return .front
+        case 3: return .leftPillar
+        case 4: return .rightPillar
+        case 5: return .leftRepeater
+        case 6: return .rightRepeater
+        case 7: return .back
         default: return nil
         }
     }
@@ -462,18 +472,23 @@ struct Clip: Identifiable, Hashable {
 
     /// Where the playable timeline actually begins.
     ///
-    /// A Sentry folder is *named* for the moment of the event, but the footage
-    /// inside starts earlier — so the folder date is the wrong zero point for
-    /// the clock and for the event marker.
+    /// A Sentry folder is named for roughly when the recording *finished*, not
+    /// when the event happened — measured against a real clip, the folder
+    /// stamp lands about a minute after the `event.json` timestamp and right at
+    /// the end of ten minutes of footage. So the folder date is the wrong zero
+    /// point for both the clock and the event marker.
     var timelineStart: Date {
         segments.first?.timestamp ?? startDate
     }
 
     /// Offset of the triggering event along the timeline, when it falls inside
     /// the recorded footage. This is what the timeline marker points at.
+    ///
+    /// With no `event.json` timestamp there is nothing to mark. The folder name
+    /// used to stand in for it, which pointed at the very end of the clip —
+    /// worse than no marker, because it looked authoritative.
     var eventOffset: TimeInterval? {
-        let moment = event?.timestamp ?? (segments.isEmpty ? nil : startDate)
-        guard let moment else { return nil }
+        guard let moment = event?.timestamp else { return nil }
         let offset = moment.timeIntervalSince(timelineStart)
         guard offset.isFinite, duration > 0 else { return nil }
         // The car names a Sentry folder for the moment of the event, but the

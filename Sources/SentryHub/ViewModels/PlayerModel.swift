@@ -152,6 +152,11 @@ final class PlayerModel: ObservableObject {
 
         attachObservers()
 
+        // Open near what you came to see. A Sentry clip is ten minutes of
+        // buffer wrapped around a few seconds that matter.
+        let opening = openingPosition
+        if opening > 0 { seek(to: opening) }
+
         let loaded = await TelemetryLoader.load(for: clip)
         telemetry = loaded
         availability = TelemetryAvailability(track: loaded, hasCity: clip.city != nil)
@@ -382,9 +387,28 @@ final class PlayerModel: ObservableObject {
     /// at the moment itself. Adjustable in Settings → Playback.
     static var eventPreRoll: TimeInterval {
         guard let stored = UserDefaults.standard.object(forKey: "eventPreRoll") as? Double else {
-            return 5
+            return 20
         }
-        return min(max(stored, 0), 30)
+        return min(max(stored, 0), 120)
+    }
+
+    /// How far before the event a clip opens.
+    ///
+    /// Tesla keeps about ten minutes of buffer around a Sentry trigger, so the
+    /// thing you opened the clip for is usually nine minutes in. Starting at
+    /// 0:00 means watching an empty street until it happens.
+    static var openingLeadIn: TimeInterval {
+        guard let stored = UserDefaults.standard.object(forKey: "openingLeadIn") as? Double else {
+            return 60
+        }
+        return min(max(stored, 0), 600)
+    }
+
+    /// Where playback should begin: a minute before the event when there is
+    /// one, otherwise the top of the clip.
+    var openingPosition: TimeInterval {
+        guard Self.openingLeadIn > 0, let eventOffset else { return 0 }
+        return max(0, eventOffset - Self.openingLeadIn)
     }
 
     func jumpToEvent() {
