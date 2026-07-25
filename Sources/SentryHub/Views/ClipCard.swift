@@ -125,18 +125,16 @@ struct ClipCard: View {
             }
 
             VStack {
-                // What happened leads; which folder it came from is secondary.
+                // The badge answers one question: what happened. A Recent clip
+                // is just the car recording as it drives — nothing happened, so
+                // it gets no badge rather than one naming the folder it sits in.
                 HStack(spacing: 6) {
                     if let trigger = clip.trigger {
                         triggerBadge(trigger)
-                        categoryChip
                     } else if let reason = clip.event?.reasonLabel {
                         // Tesla has shipped reason strings we don't classify. Show
                         // them anyway rather than dropping the badge silently.
                         genericEventBadge(reason)
-                        categoryChip
-                    } else {
-                        categoryBadge
                     }
                     durationChip
                     Spacer()
@@ -205,20 +203,6 @@ struct ClipCard: View {
         .help(isSelected ? "Deselect this clip" : "Select this clip")
     }
 
-    private var categoryBadge: some View {
-        HStack(spacing: 4) {
-            Image(systemName: clip.category.symbolName)
-                .font(.system(size: 9, weight: .semibold))
-            Text(clip.category.label.uppercased())
-                .font(.system(size: 9, weight: .bold))
-                .tracking(0.8)
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Capsule().fill(badgeColor.opacity(0.85)))
-    }
-
     /// Why the car kept it — the same pill the library filters by.
     private func triggerBadge(_ trigger: ClipTrigger) -> some View {
         HStack(spacing: 4) {
@@ -256,30 +240,6 @@ struct ClipCard: View {
         case .impact: return Color(red: 0.78, green: 0.22, blue: 0.14)
         case .honk: return Color(red: 0.46, green: 0.30, blue: 0.72)
         case .manualSave: return Color(red: 0.16, green: 0.46, blue: 0.44)
-        }
-    }
-
-    /// Compact form of the category, used when the trigger badge is leading.
-    private var categoryChip: some View {
-        HStack(spacing: 3) {
-            Image(systemName: clip.category.symbolName)
-                .font(.system(size: 8, weight: .semibold))
-            Text(clip.category.label.uppercased())
-                .font(.system(size: 8, weight: .semibold))
-                .tracking(0.6)
-        }
-        .foregroundStyle(.white.opacity(0.85))
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(Capsule().fill(Color.black.opacity(0.5)))
-        .overlay(Capsule().strokeBorder(badgeColor.opacity(0.8), lineWidth: 1))
-    }
-
-    private var badgeColor: Color {
-        switch clip.category {
-        case .sentry: return Color(red: 0.72, green: 0.14, blue: 0.25)
-        case .saved: return Color(red: 0.14, green: 0.45, blue: 0.72)
-        case .recent: return Color(red: 0.30, green: 0.32, blue: 0.38)
         }
     }
 
@@ -323,7 +283,6 @@ struct ClipCard: View {
 
             HStack(spacing: 6) {
                 infoChip(Format.bytes(clip.byteCount))
-                categoryPill
                 storagePill
             }
             .padding(.top, 2)
@@ -381,26 +340,6 @@ struct ClipCard: View {
                 .help("Click to rename — the files on the drive keep their own name")
             }
         }
-    }
-
-    private var categoryPill: some View {
-        HStack(spacing: 4) {
-            Image(systemName: clip.category.symbolName)
-                .font(.system(size: 9, weight: .semibold))
-            Text(clip.category.label)
-                .font(.system(size: 10, weight: .semibold))
-        }
-        .foregroundStyle(badgeColor)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(badgeColor.opacity(0.14))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(badgeColor.opacity(0.35), lineWidth: 1)
-        )
     }
 
     /// Whether this footage survives the drive being unplugged — the one thing
