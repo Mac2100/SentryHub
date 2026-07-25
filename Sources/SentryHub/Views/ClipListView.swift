@@ -21,17 +21,23 @@ struct ClipRow: View {
     private var thumbnailWidth: CGFloat { density.listThumbnailWidth }
     private var thumbnailHeight: CGFloat { thumbnailWidth * 9 / 16 }
 
+    private var showsSelectionToggle: Bool {
+        isSelected || isSelecting || isHovering
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            if isSelecting || isSelected {
-                Button(action: onToggleSelection) {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(isSelected ? theme.primary : Color.secondary)
-                }
-                .buttonStyle(.plain)
-                .frame(width: 20)
+            // Always laid out so the columns never shift, but only drawn under
+            // the pointer — or on every row at once, once anything is selected.
+            Button(action: onToggleSelection) {
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(isSelected ? theme.primary : Color.secondary)
             }
+            .buttonStyle(.plain)
+            .opacity(showsSelectionToggle ? 1 : 0)
+            .allowsHitTesting(showsSelectionToggle)
+            .frame(width: 20)
 
             thumbnail
 
@@ -216,9 +222,7 @@ struct ClipListHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            if isSelecting {
-                Color.clear.frame(width: 20)
-            }
+            Color.clear.frame(width: 20)
             Color.clear.frame(width: thumbnailWidth, height: 1)
             caption("CLIP")
             Spacer(minLength: 8)

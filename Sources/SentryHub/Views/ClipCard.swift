@@ -138,9 +138,9 @@ struct ClipCard: View {
                     }
                     durationChip
                     Spacer()
-                    if isSelecting || isSelected {
-                        selectionToggle
-                    }
+                    // Always there: it's how selection starts, so hiding it
+                    // behind a mode you can only enter elsewhere defeats it.
+                    selectionToggle
                 }
                 Spacer()
                 if cameras.count > 1 {
@@ -184,22 +184,36 @@ struct ClipCard: View {
         .padding(.top, 6)
     }
 
+    /// Hidden until the pointer is over the card, so a quiet gallery stays
+    /// quiet. Once anything is selected it shows on every card at once —
+    /// otherwise adding the second clip to a selection would mean hunting for
+    /// an invisible target.
+    private var showsSelectionToggle: Bool {
+        isSelected || isSelecting || isHovering
+    }
+
     private var selectionToggle: some View {
         Button(action: onToggleSelection) {
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 19, weight: .medium))
-                .symbolRenderingMode(isSelected ? .palette : .monochrome)
-                .foregroundStyle(
-                    isSelected ? Color.white : Color.white.opacity(0.85),
-                    isSelected ? theme.primary : Color.clear
-                )
-                .background(
-                    Circle()
-                        .fill(Color.black.opacity(isSelected ? 0 : 0.35))
-                        .padding(2)
-                )
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(isSelected ? theme.primary : Color.black.opacity(0.35))
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? Color.clear : Color.white.opacity(0.75),
+                        lineWidth: 1.5
+                    )
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .frame(width: 20, height: 20)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .opacity(showsSelectionToggle ? 1 : 0)
+        .allowsHitTesting(showsSelectionToggle)
         .help(isSelected ? "Deselect this clip" : "Select this clip")
     }
 
@@ -274,11 +288,19 @@ struct ClipCard: View {
                 text: "\(clip.startDate.formatted(.dateTime.month(.abbreviated).day().year())) · \(clip.startDate.formatted(date: .omitted, time: .shortened))"
             )
 
-            // Where it happened, in words. The coordinates behind it are still
-            // one right-click away, and the map view plots the pin.
+            // Where it happened, in words where the car gave words. Tesla only
+            // names a town in event.json, which it doesn't write beside Recent
+            // clips — so rather than leaving those cards with a silent gap,
+            // fall back to the fix and then to saying there isn't one.
             if let city = clip.city {
                 metaRow(symbol: "building.2", text: city)
                     .help(coordinateText ?? city)
+            } else if let coordinateText {
+                metaRow(symbol: "mappin.and.ellipse", text: coordinateText)
+            } else {
+                metaRow(symbol: "mappin.slash", text: "No location recorded")
+                    .help("The car saved no position with this clip.")
+                    .foregroundStyle(.tertiary)
             }
 
             HStack(spacing: 6) {

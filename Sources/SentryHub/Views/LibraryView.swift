@@ -373,24 +373,6 @@ struct LibraryView: View {
                 }
 
                 Spacer()
-
-                Button {
-                    if library.isSelecting {
-                        library.endSelecting()
-                    } else {
-                        library.beginSelecting()
-                    }
-                } label: {
-                    Label(
-                        library.isSelecting ? "Done" : "Select",
-                        systemImage: library.isSelecting
-                            ? "xmark.circle" : "checkmark.circle"
-                    )
-                    .font(.system(size: 12, weight: .medium))
-                    .padding(.horizontal, 4)
-                }
-                .buttonStyle(.bordered)
-                .tint(library.isSelecting ? theme.primary : nil)
             }
         }
         .padding(14)
@@ -420,8 +402,15 @@ struct LibraryView: View {
         let isBusy = LocalLibrary.shared.transfer != nil
 
         return HStack(spacing: 10) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(theme.primary)
+            // The way out, where the reference puts it: at the head of the bar
+            // that appears when selection starts.
+            Button("Cancel") { library.endSelecting() }
+                .buttonStyle(.link)
+                .font(.system(size: 12, weight: .medium))
+                .keyboardShortcut(.cancelAction)
+
+            Divider().frame(height: 16)
+
             Text("\(selected.count) selected")
                 .font(.system(size: 13, weight: .semibold))
                 .monospacedDigit()

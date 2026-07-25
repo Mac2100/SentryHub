@@ -222,7 +222,8 @@ enum LibraryScanner {
     // MARK: - Durations
 
     /// Replaces the assumed 60 s segment length with the real duration read from
-    /// the container. Runs off the main actor; call it after the initial scan so
+    /// the container, and fills in a location for clips `event.json` said
+    /// nothing about. Runs off the main actor; call it after the initial scan so
     /// the library appears immediately.
     static func resolveDurations(for clip: Clip) async -> Clip {
         var updated = clip
@@ -242,6 +243,39 @@ enum LibraryScanner {
                 updated.segments[index].duration = longest
             }
         }
-        return updated
+        return await resolveEmbeddedLocation(for: updated)
+    }
+
+    /// Tesla writes no `event.json` beside a Recent clip, so those cards had no
+    /// location at all. Some firmware does stamp an ISO-6709 location atom into
+    /// the MP4 itself — the player already reads it for the HUD, but the library
+    /// never looked, so a fix sitting in the file went unused.
+    ///
+    /// This reads the real atom or gives up. It never borrows a position from a
+    /// neighbouring clip: two recordings a minute apart are not the same place,
+    /// and a plausible-looking wrong pin is worse than an empty one.
+    private static func resolveEmbeddedLocation(for clip: Clip) async -> Clip {
+        guard clip.coordinate == nil,
+              let url = clip.segments.first.flatMap({ segment in
+                  CameraAngle.preferredFocusOrder.compactMap { segment.files[$0] }.first
+              }) else { return clip }
+
+        let asset = AVURLAsset(url: url)
+        guard let items = try? await asset.load(.metadata) else { return clip }
+
+        for item in items {
+            guard let identifier = item.identifier?.rawValue.lowercased(),
+                  identifier.contains("location") else { continue }
+            guard let string = try? await item.load(.stringValue),
+                  let fix = TelemetryLoader.parseISO6709(string) else { continue }
+
+            var updated = clip
+            var event = updated.event ?? EventMetadata()
+            event.latitude = fix.latitude
+            event.longitude = fix.longitude
+            updated.event = event
+            return updated
+        }
+        return clip
     }
 }
