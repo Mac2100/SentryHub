@@ -77,12 +77,18 @@ and exports a range to MP4 with the HUD burned in.
 - **Event focus** — Tesla wraps roughly ten minutes of buffer around a Sentry trigger, so the moment
   you opened the clip for is usually nine minutes in. A clip with a flagged moment therefore **opens
   a minute before it** rather than at 0:00, and the marker is reachable with one click or the `E`
-  key, landing **20 seconds early** so the lead-in is visible. Both distances are adjustable in
+  key, landing **8 seconds early** so the lead-in is visible. Both distances are adjustable in
   Settings → Playback, and clips with no event still open at the start. The camera that
-  saw it is traced with a pulsing highlight that quickens as the play head closes in — but only for
-  a **Sentry motion or impact**, and only in the seconds around the event itself. A horn press or a
+  saw it is traced with a pulsing highlight that lights up **six seconds before** the moment and
+  fades once it has passed — but only for a **Sentry motion or impact**. A horn press or a
   manual save is the driver already knowing what happened, and a highlight shown on every clip is
   one nobody reads.
+- **First-run walkthrough** — the first time the library opens, the window dims and each part is
+  ringed in turn with a sentence explaining it: the two tabs, the stat row, the folder-and-reason
+  chips, the storage filter, the Grid/List/Map switch, and the gallery. Click anywhere to move on,
+  Skip to leave, and **Settings → General → Walkthrough → Show Again** to see it later. The
+  highlights are anchored to the real controls, so they follow them as the window resizes and as
+  chips appear and disappear with the library's contents.
 - **Themes & appearance** — six accent themes and a System/Light/Dark override.
 - **One-click updates** — an optional launch check against GitHub Releases; installing downloads
   the DMG, swaps the app in place, and relaunches.

@@ -387,7 +387,7 @@ final class PlayerModel: ObservableObject {
     /// at the moment itself. Adjustable in Settings → Playback.
     static var eventPreRoll: TimeInterval {
         guard let stored = UserDefaults.standard.object(forKey: "eventPreRoll") as? Double else {
-            return 20
+            return 8
         }
         return min(max(stored, 0), 120)
     }
@@ -440,13 +440,23 @@ final class PlayerModel: ObservableObject {
         deservesEventTrace && eventUrgency > 0
     }
 
-    /// 0…1, rising as the play head closes on the event. Drives how fast and
-    /// bright the event camera's trace pulses.
+    /// How far ahead of the event the trace lights up.
+    static let traceLeadIn: TimeInterval = 6
+    /// And how long it lingers afterwards, so it doesn't snap off mid-incident.
+    static let traceTail: TimeInterval = 4
+
+    /// 0…1, rising as the play head closes on the event and falling away after.
+    /// Drives how fast and bright the event camera's trace pulses.
+    ///
+    /// Deliberately asymmetric: it starts six seconds out, giving you time to
+    /// look at the right tile *before* anything happens, then fades once it has.
     var eventUrgency: Double {
         guard let eventOffset else { return 0 }
-        let distance = abs(currentTime - eventOffset)
-        guard distance < 6 else { return 0 }
-        return 1 - distance / 6
+        let delta = currentTime - eventOffset
+        if delta < -Self.traceLeadIn || delta > Self.traceTail { return 0 }
+        return delta <= 0
+            ? 1 + delta / Self.traceLeadIn
+            : 1 - delta / Self.traceTail
     }
 
     /// Snapshots map tiles for the mini map. Cheap to call repeatedly — the
