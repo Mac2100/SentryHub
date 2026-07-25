@@ -206,15 +206,19 @@ struct HUDSettingsTab: View {
             HUDSettingsPanel(config: $hudStore.config)
                 .frame(width: 300)
             Divider()
-            MapSettingsPanel(config: $hudStore.config)
-                .frame(width: 300)
+            VStack(spacing: 0) {
+                MapSettingsPanel(config: $hudStore.config)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Divider()
+                MapAdvancedSettingsPanel(config: $hudStore.config)
+                Divider()
+                Button("Reset All HUD Settings") { hudStore.reset() }
+                    .controlSize(.small)
+                    .padding(8)
+            }
+            .frame(width: 300)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .overlay(alignment: .bottom) {
-            Button("Reset All HUD Settings") { hudStore.reset() }
-                .controlSize(.small)
-                .padding(8)
-        }
     }
 }
 

@@ -81,24 +81,60 @@ enum HUDCorner: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-enum MapStyleOption: String, Codable, CaseIterable, Identifiable {
-    case standard, hybrid, satellite
+/// The map popover's **Theme** chip.
+enum MapTheme: String, Codable, CaseIterable, Identifiable {
+    case dark, light, satellite
 
     var id: String { rawValue }
 
+    /// Shown inside the value chip, e.g. `DARK`.
+    var chipLabel: String { rawValue.uppercased() }
+
     var label: String {
         switch self {
-        case .standard: return "Standard"
-        case .hybrid: return "Hybrid"
+        case .dark: return "Dark"
+        case .light: return "Light"
         case .satellite: return "Satellite"
         }
     }
+}
 
-    var symbolName: String {
+/// The map popover's **Rotation** chip: follow the car's heading, or keep north up.
+enum MapRotation: String, Codable, CaseIterable, Identifiable {
+    case heading, northUp
+
+    var id: String { rawValue }
+
+    var chipLabel: String {
         switch self {
-        case .standard: return "map"
-        case .hybrid: return "globe.americas"
-        case .satellite: return "globe"
+        case .heading: return "HEADING"
+        case .northUp: return "NORTH UP"
+        }
+    }
+
+    var followsHeading: Bool { self == .heading }
+}
+
+/// The map popover's **Size** segments.
+enum MapSize: String, Codable, CaseIterable, Identifiable {
+    case small, medium, large
+
+    var id: String { rawValue }
+
+    var chipLabel: String {
+        switch self {
+        case .small: return "S"
+        case .medium: return "M"
+        case .large: return "L"
+        }
+    }
+
+    /// Multiplier applied to the mini map's base width.
+    var scale: CGFloat {
+        switch self {
+        case .small: return 0.78
+        case .medium: return 1.0
+        case .large: return 1.32
         }
     }
 }
@@ -150,18 +186,33 @@ struct HUDConfiguration: Codable, Equatable {
     var scale: Double = 1.0
     var watermark: Bool = true
 
-    // Map
+    // Map — the six rows of the Map popover…
     var mapEnabled: Bool = true
-    var mapStyle: MapStyleOption = .standard
+    var mapTheme: MapTheme = .dark
+    var mapRotation: MapRotation = .heading
+    /// Standard slippy-map zoom level; converted to a metric span for the
+    /// vector mini map and to a region span for the interactive map.
+    var mapZoomLevel: Double = 15
+    var mapSize: MapSize = .small
+    /// Frame the whole drive instead of staying centred on the car.
+    var mapRouteOverview: Bool = false
+
+    // …plus the extras, which live in Settings → HUD rather than the popover.
     var mapCorner: HUDCorner = .topTrailing
-    var mapSize: Double = 1.0
-    var mapZoomMeters: Double = 700
     var mapTrackStyle: MapTrackStyle = .full
     var mapShowEndpoints: Bool = true
-    var mapRotateWithHeading: Bool = false
     var mapOpacity: Double = 0.95
     var mapShowLabel: Bool = true
     var mapIncludeInExport: Bool = true
+
+    /// Metres covered across `pixelWidth` points at the configured zoom level.
+    func mapSpanMeters(atLatitude latitude: Double, pixelWidth: CGFloat) -> Double {
+        // Web-Mercator ground resolution at 256 px tiles.
+        let metersPerPixel = 156_543.03392
+            * cos(latitude * .pi / 180)
+            / pow(2, mapZoomLevel)
+        return max(metersPerPixel * Double(pixelWidth), 40)
+    }
 
     static let `default` = HUDConfiguration()
 

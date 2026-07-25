@@ -212,38 +212,121 @@ struct HUDSettingsPanel: View {
 
 // MARK: - Map panel
 
-/// The **Map** popover — controls the mini map baked into the HUD as well as
-/// the interactive route map.
+/// Status dot used by the Map popover's boolean rows — green when on, dim when
+/// off — matching the reference design rather than a switch.
+struct DotToggle: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            Circle()
+                .fill(isOn ? Color.green : Color.secondary.opacity(0.4))
+                .frame(width: 8, height: 8)
+                .padding(5)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Value chip that advances to the next case when clicked (Theme, Rotation).
+struct CycleChip<Value>: View where Value: CaseIterable & Equatable,
+                                    Value.AllCases: RandomAccessCollection {
+    @Binding var selection: Value
+    let label: (Value) -> String
+
+    var body: some View {
+        Button {
+            let all = Array(Value.allCases)
+            guard let index = all.firstIndex(of: selection), !all.isEmpty else { return }
+            selection = all[(index + 1) % all.count]
+        } label: {
+            Text(label(selection))
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.7)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.primary.opacity(0.09))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+    }
+}
+
+/// The **Map** popover: Visible, Theme, Rotation, Zoom, Size, Route Overview.
+/// The less-used options live in Settings → HUD so this stays as compact as the
+/// reference design.
 struct MapSettingsPanel: View {
+    @Binding var config: HUDConfiguration
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            PanelCaption(text: "MAP SETTINGS")
+                .padding(.bottom, 8)
+
+            SettingRow(symbol: "eye", label: "Visible") {
+                DotToggle(isOn: $config.mapEnabled)
+            }
+
+            SettingRow(symbol: "map", label: "Theme") {
+                CycleChip(selection: $config.mapTheme) { $0.chipLabel }
+            }
+
+            SettingRow(symbol: "location.circle", label: "Rotation") {
+                CycleChip(selection: $config.mapRotation) { $0.chipLabel }
+            }
+
+            SliderRow(caption: "ZOOM", value: $config.mapZoomLevel, range: 8...20) {
+                "\(Int($0.rounded()))"
+            }
+
+            SettingRow(symbol: "arrow.up.left.and.arrow.down.right", label: "Size") {
+                MiniSegments(
+                    options: MapSize.allCases.map { ($0, $0.chipLabel) },
+                    selection: $config.mapSize
+                )
+            }
+
+            SettingRow(
+                symbol: "point.topleft.down.curvedto.point.bottomright.up",
+                label: "Route Overview"
+            ) {
+                DotToggle(isOn: $config.mapRouteOverview)
+            }
+        }
+        .padding(14)
+    }
+}
+
+/// The map options that don't fit the compact popover, shown in Settings → HUD.
+struct MapAdvancedSettingsPanel: View {
     @Binding var config: HUDConfiguration
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                PanelCaption(text: "MAP", action: (label: "Reset", run: {
+                PanelCaption(text: "MAP — MORE", action: (label: "Reset", run: {
                     let defaults = HUDConfiguration.default
                     config.mapEnabled = defaults.mapEnabled
-                    config.mapStyle = defaults.mapStyle
-                    config.mapCorner = defaults.mapCorner
+                    config.mapTheme = defaults.mapTheme
+                    config.mapRotation = defaults.mapRotation
+                    config.mapZoomLevel = defaults.mapZoomLevel
                     config.mapSize = defaults.mapSize
-                    config.mapZoomMeters = defaults.mapZoomMeters
+                    config.mapRouteOverview = defaults.mapRouteOverview
+                    config.mapCorner = defaults.mapCorner
                     config.mapTrackStyle = defaults.mapTrackStyle
                     config.mapShowEndpoints = defaults.mapShowEndpoints
-                    config.mapRotateWithHeading = defaults.mapRotateWithHeading
                     config.mapOpacity = defaults.mapOpacity
                     config.mapShowLabel = defaults.mapShowLabel
                     config.mapIncludeInExport = defaults.mapIncludeInExport
                 }))
                 .padding(.bottom, 6)
-
-                SettingToggleRow(symbol: "map", label: "Show Mini Map", isOn: $config.mapEnabled)
-
-                SettingRow(symbol: "globe.americas", label: "Map Style") {
-                    MiniSegments(
-                        options: MapStyleOption.allCases.map { ($0, $0.label.uppercased()) },
-                        selection: $config.mapStyle
-                    )
-                }
 
                 SettingRow(symbol: "square.on.square", label: "Position") {
                     HStack(spacing: 3) {
@@ -273,8 +356,10 @@ struct MapSettingsPanel: View {
                     }
                 }
 
-                SettingRow(symbol: "point.topleft.down.curvedto.point.bottomright.up",
-                           label: "Route") {
+                SettingRow(
+                    symbol: "point.topleft.down.curvedto.point.bottomright.up",
+                    label: "Route Line"
+                ) {
                     MiniSegments(
                         options: [
                             (MapTrackStyle.full, "ALL"),
@@ -291,13 +376,8 @@ struct MapSettingsPanel: View {
                     isOn: $config.mapShowEndpoints
                 )
                 SettingToggleRow(
-                    symbol: "location.north.line",
-                    label: "Rotate With Heading",
-                    isOn: $config.mapRotateWithHeading
-                )
-                SettingToggleRow(
                     symbol: "textformat.size.smaller",
-                    label: "Show “MAP” Label",
+                    label: "Show \u{201C}MAP\u{201D} Label",
                     isOn: $config.mapShowLabel
                 )
                 SettingToggleRow(
@@ -308,20 +388,11 @@ struct MapSettingsPanel: View {
 
                 Divider().padding(.vertical, 8)
 
-                SliderRow(caption: "SIZE", value: $config.mapSize, range: 0.6...1.8) {
-                    "\(Int(($0 * 100).rounded()))%"
-                }
-                SliderRow(caption: "ZOOM", value: $config.mapZoomMeters, range: 120...4000) {
-                    $0 >= 1000
-                        ? String(format: "%.1f km", $0 / 1000)
-                        : "\(Int($0.rounded())) m"
-                }
                 SliderRow(caption: "OPACITY", value: $config.mapOpacity, range: 0.2...1.0) {
                     "\(Int(($0 * 100).rounded()))%"
                 }
             }
             .padding(14)
         }
-        .frame(width: 300, height: 470)
     }
 }

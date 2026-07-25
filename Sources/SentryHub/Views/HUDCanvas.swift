@@ -304,7 +304,7 @@ struct HUDCanvas: View {
     // MARK: - Map
 
     private var miniMap: some View {
-        let width = 190 * unit * CGFloat(config.mapSize)
+        let width = 210 * unit * config.mapSize.scale
         return RouteMiniMap(
             route: route,
             position: sample?.coordinate,

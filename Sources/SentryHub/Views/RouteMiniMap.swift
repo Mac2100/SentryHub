@@ -17,27 +17,30 @@ struct RouteMiniMap: View {
     var unit: CGFloat = 1
 
     private var palette: Palette {
-        switch config.mapStyle {
-        case .standard:
+        switch config.mapTheme {
+        case .dark:
             return Palette(
                 background: Color(red: 0.06, green: 0.09, blue: 0.15),
                 grid: Color.white.opacity(0.06),
                 route: Color(red: 0.35, green: 0.72, blue: 1.0),
-                traveled: Color(red: 0.20, green: 0.55, blue: 1.0)
+                traveled: Color(red: 0.20, green: 0.55, blue: 1.0),
+                ink: Color.white
             )
-        case .hybrid:
+        case .light:
             return Palette(
-                background: Color(red: 0.10, green: 0.12, blue: 0.09),
-                grid: Color.white.opacity(0.05),
-                route: Color(red: 0.62, green: 0.90, blue: 0.70),
-                traveled: Color(red: 0.30, green: 0.78, blue: 0.52)
+                background: Color(red: 0.90, green: 0.92, blue: 0.95),
+                grid: Color.black.opacity(0.07),
+                route: Color(red: 0.30, green: 0.55, blue: 0.90),
+                traveled: Color(red: 0.10, green: 0.38, blue: 0.85),
+                ink: Color.black
             )
         case .satellite:
             return Palette(
                 background: Color(red: 0.09, green: 0.08, blue: 0.07),
                 grid: Color.white.opacity(0.04),
                 route: Color(red: 1.0, green: 0.83, blue: 0.42),
-                traveled: Color(red: 1.0, green: 0.66, blue: 0.20)
+                traveled: Color(red: 1.0, green: 0.66, blue: 0.20),
+                ink: Color.white
             )
         }
     }
@@ -47,6 +50,8 @@ struct RouteMiniMap: View {
         let grid: Color
         let route: Color
         let traveled: Color
+        /// Foreground colour for the label and the "no GPS" notice.
+        let ink: Color
     }
 
     var body: some View {
@@ -106,7 +111,9 @@ struct RouteMiniMap: View {
                         Image(systemName: "location.north.fill")
                             .font(.system(size: 8 * unit, weight: .bold))
                             .foregroundStyle(.white)
-                            .rotationEffect(.degrees(config.mapRotateWithHeading ? 0 : (heading ?? 0)))
+                            .rotationEffect(
+                                .degrees(config.mapRotation.followsHeading ? 0 : (heading ?? 0))
+                            )
                     }
                     .shadow(color: .black.opacity(0.4), radius: 2 * unit)
                     .position(marker)
@@ -116,26 +123,26 @@ struct RouteMiniMap: View {
                     Text("NO GPS")
                         .font(.system(size: 8 * unit, weight: .semibold))
                         .tracking(1)
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(colors.ink.opacity(0.45))
                 }
 
                 if config.mapShowLabel {
                     Text("MAP")
                         .font(.system(size: 8 * unit, weight: .semibold))
                         .tracking(1.2)
-                        .foregroundStyle(.white.opacity(0.75))
+                        .foregroundStyle(colors.ink.opacity(0.75))
                         .padding(.horizontal, 5 * unit)
                         .padding(.vertical, 2 * unit)
                         .background(
                             RoundedRectangle(cornerRadius: 4 * unit, style: .continuous)
-                                .fill(Color.black.opacity(0.45))
+                                .fill(colors.background.opacity(0.75))
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(5 * unit)
                 }
             }
             .rotationEffect(
-                config.mapRotateWithHeading ? .degrees(-(heading ?? 0)) : .zero
+                config.mapRotation.followsHeading ? .degrees(-(heading ?? 0)) : .zero
             )
             .clipShape(RoundedRectangle(cornerRadius: 9 * unit, style: .continuous))
             .overlay(
@@ -144,6 +151,13 @@ struct RouteMiniMap: View {
             )
         }
         .opacity(config.mapOpacity)
+    }
+
+    static func centroid(of route: [CLLocationCoordinate2D]) -> CLLocationCoordinate2D {
+        guard !route.isEmpty else { return CLLocationCoordinate2D(latitude: 0, longitude: 0) }
+        let latitude = route.reduce(0) { $0 + $1.latitude } / Double(route.count)
+        let longitude = route.reduce(0) { $0 + $1.longitude } / Double(route.count)
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 
     private func line(_ points: [CGPoint]) -> Path {
@@ -162,32 +176,44 @@ struct RouteMiniMap: View {
         return points[min(max(index, 0), points.count - 1)]
     }
 
-    /// Equirectangular projection of the route into the card, centred on the
-    /// current position and scaled by the configured zoom.
+    /// Equirectangular projection of the route into the card.
+    ///
+    /// Normally the card stays centred on the car at the configured zoom level;
+    /// with **Route Overview** on it centres on the route and zooms out far
+    /// enough to frame the whole drive.
     private func projected(into box: CGSize) -> [CGPoint] {
         guard !route.isEmpty else { return [] }
 
-        let center = position ?? route[route.count / 2]
+        let inset = 10 * unit
+        let usable = min(box.width, box.height) - inset * 2
+        guard usable > 0 else { return [] }
+
+        let center = config.mapRouteOverview
+            ? RouteMiniMap.centroid(of: route)
+            : (position ?? route[route.count / 2])
         let latitudeRadians = center.latitude * .pi / 180
         let metersPerDegreeLatitude = 111_320.0
         let metersPerDegreeLongitude = metersPerDegreeLatitude * max(cos(latitudeRadians), 0.01)
 
-        // Fit the route, but never zoom in past the configured span.
-        var spanMeters = config.mapZoomMeters
         var maxDistance = 0.0
         for coordinate in route {
             let dx = (coordinate.longitude - center.longitude) * metersPerDegreeLongitude
             let dy = (coordinate.latitude - center.latitude) * metersPerDegreeLatitude
             maxDistance = max(maxDistance, max(abs(dx), abs(dy)))
         }
-        if maxDistance > 0 {
-            spanMeters = min(spanMeters, maxDistance * 2.4)
-        }
-        spanMeters = max(spanMeters, 60)
 
-        let inset = 10 * unit
-        let usable = min(box.width, box.height) - inset * 2
-        guard usable > 0 else { return [] }
+        var spanMeters: Double
+        if config.mapRouteOverview {
+            spanMeters = max(maxDistance * 2.3, 60)
+        } else {
+            spanMeters = config.mapSpanMeters(atLatitude: center.latitude, pixelWidth: usable)
+            // Don't zoom out past the route itself — an empty card reads as broken.
+            if maxDistance > 0 {
+                spanMeters = min(spanMeters, maxDistance * 2.4)
+            }
+            spanMeters = max(spanMeters, 60)
+        }
+
         let scale = usable / spanMeters
 
         return route.map { coordinate in

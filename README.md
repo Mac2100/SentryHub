@@ -28,9 +28,11 @@ MP4 with the HUD burned in.
   g-force indicator, date, time, location, turn signals, and compass & coordinates, each toggled
   individually. Choose KM/H, MPH and M/S (any combination), 0–2 speed decimals, an AUTO/US/EU/ISO
   date format, and interface opacity and size.
-- **Maps** — a vector mini map baked into the HUD (style, corner, size, zoom, route mode, endpoint
-  markers, heading rotation, opacity) plus a tile-backed interactive route map behind the transport
-  bar's **Map** button, whose marker follows the play head.
+- **Maps** — a vector mini map baked into the HUD, with a **Map Settings** popover for Visible,
+  Theme (Dark / Light / Satellite), Rotation (Heading / North Up), Zoom level, Size (S / M / L), and
+  Route Overview; corner, route line, endpoint markers, label, export inclusion, and opacity live in
+  Settings → HUD. Behind the same button sits a tile-backed interactive route map whose camera
+  follows the play head — or frames the whole drive when Route Overview is on.
 - **Trim & export** — set IN and OUT points on the timeline, then export the current grid to MP4.
   The HUD is rendered by the *same* SwiftUI view the player uses, so exports are WYSIWYG. Also
   exports the current frame as a PNG.

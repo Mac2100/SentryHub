@@ -404,15 +404,15 @@ struct PlayerView: View {
                         route: model.telemetry.route,
                         current: model.currentSample?.coordinate,
                         heading: model.currentSample?.heading,
-                        style: hudStore.config.mapStyle,
-                        showEndpoints: hudStore.config.mapShowEndpoints
+                        config: hudStore.config
                     )
                     .frame(width: 460, height: 380)
                 case .settings:
                     MapSettingsPanel(config: $hudStore.config)
+                        .frame(width: 260)
                 }
             }
-            .frame(width: mapPanelTab == .route ? 460 : 300)
+            .frame(width: mapPanelTab == .route ? 460 : 260)
         }
     }
 

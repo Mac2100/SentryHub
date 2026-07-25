@@ -2,13 +2,18 @@ import CoreLocation
 import MapKit
 import SwiftUI
 
-extension MapStyleOption {
+extension MapTheme {
     var mapStyle: MapStyle {
         switch self {
-        case .standard: return .standard
-        case .hybrid: return .hybrid
+        case .dark, .light: return .standard(elevation: .realistic)
         case .satellite: return .imagery
         }
+    }
+
+    /// MapKit renders the standard style light or dark from the environment's
+    /// colour scheme, so the theme drives that rather than the style itself.
+    var colorScheme: ColorScheme {
+        self == .light ? .light : .dark
     }
 }
 
@@ -112,11 +117,20 @@ struct RouteMapView: View {
     let route: [CLLocationCoordinate2D]
     let current: CLLocationCoordinate2D?
     let heading: Double?
-    let style: MapStyleOption
-    let showEndpoints: Bool
+    let config: HUDConfiguration
 
     @State private var position: MapCameraPosition = .automatic
-    @State private var follow = true
+
+    /// Route Overview frames the whole drive; otherwise the camera follows the
+    /// play head at the configured zoom level.
+    private var followsCar: Bool { !config.mapRouteOverview }
+
+    private var regionSpanMeters: Double {
+        config.mapSpanMeters(
+            atLatitude: current?.latitude ?? route.first?.latitude ?? 0,
+            pixelWidth: 460
+        )
+    }
 
     var body: some View {
         Map(position: $position) {
@@ -127,11 +141,11 @@ struct RouteMapView: View {
                         style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
                     )
             }
-            if showEndpoints, let first = route.first {
+            if config.mapShowEndpoints, let first = route.first {
                 Marker("Start", systemImage: "flag.fill", coordinate: first)
                     .tint(.green)
             }
-            if showEndpoints, route.count > 1, let last = route.last {
+            if config.mapShowEndpoints, route.count > 1, let last = route.last {
                 Marker("End", systemImage: "flag.checkered", coordinate: last)
                     .tint(.orange)
             }
@@ -150,32 +164,27 @@ struct RouteMapView: View {
                 }
             }
         }
-        .mapStyle(style.mapStyle)
+        .mapStyle(config.mapTheme.mapStyle)
+        .environment(\.colorScheme, config.mapTheme.colorScheme)
         .mapControls {
             MapCompass()
             MapZoomStepper()
         }
         .overlay(alignment: .topLeading) {
-            Toggle(isOn: $follow) {
-                Label("Follow", systemImage: "location.fill")
-                    .font(.caption)
-            }
-            .toggleStyle(.button)
-            .controlSize(.small)
+            Label(
+                config.mapRouteOverview ? "Route Overview" : "Following",
+                systemImage: config.mapRouteOverview ? "point.topleft.down.curvedto.point.bottomright.up" : "location.fill"
+            )
+            .font(.caption)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.regularMaterial, in: Capsule())
             .padding(8)
         }
-        .onChange(of: currentKey) { _, _ in
-            guard follow, let current else { return }
-            withAnimation(.easeInOut(duration: 0.3)) {
-                position = .region(
-                    MKCoordinateRegion(
-                        center: current,
-                        latitudinalMeters: 500,
-                        longitudinalMeters: 500
-                    )
-                )
-            }
-        }
+        .onChange(of: currentKey) { _, _ in recentre() }
+        .onChange(of: config.mapRouteOverview) { _, _ in recentre() }
+        .onChange(of: config.mapZoomLevel) { _, _ in recentre() }
+        .onAppear { recentre() }
         .overlay {
             if route.isEmpty {
                 VStack(spacing: 8) {
@@ -192,6 +201,24 @@ struct RouteMapView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(.regularMaterial)
             }
+        }
+    }
+
+    private func recentre() {
+        guard followsCar, let current else {
+            // .automatic frames all the map's content, i.e. the whole route.
+            withAnimation(.easeInOut(duration: 0.3)) { position = .automatic }
+            return
+        }
+        let span = regionSpanMeters
+        withAnimation(.easeInOut(duration: 0.3)) {
+            position = .region(
+                MKCoordinateRegion(
+                    center: current,
+                    latitudinalMeters: span,
+                    longitudinalMeters: span
+                )
+            )
         }
     }
 
