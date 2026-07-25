@@ -2,13 +2,14 @@ import Foundation
 import SwiftUI
 
 enum LibrarySortOrder: String, CaseIterable, Identifiable {
-    case date, duration, size, name
+    case date, category, duration, size, name
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .date: return "Date"
+        case .category: return "Category"
         case .duration: return "Length"
         case .size: return "Size"
         case .name: return "Name"
@@ -345,12 +346,28 @@ final class LibraryStore: ObservableObject {
         }
 
         switch sortOrder {
-        case .date: result.sort { $0.startDate > $1.startDate }
-        case .duration: result.sort { $0.duration > $1.duration }
-        case .size: result.sort { $0.byteCount > $1.byteCount }
-        case .name: result.sort { $0.name < $1.name }
+        case .date:
+            result.sort { $0.startDate > $1.startDate }
+        case .category:
+            // Sentry, then Saved, then Recent — newest first inside each.
+            result.sort { a, b in
+                let left = Self.categoryRank(a)
+                let right = Self.categoryRank(b)
+                if left != right { return left < right }
+                return a.startDate > b.startDate
+            }
+        case .duration:
+            result.sort { $0.duration > $1.duration }
+        case .size:
+            result.sort { $0.byteCount > $1.byteCount }
+        case .name:
+            result.sort { $0.name < $1.name }
         }
         return result
+    }
+
+    private static func categoryRank(_ clip: Clip) -> Int {
+        ClipCategory.allCases.firstIndex(of: clip.category) ?? ClipCategory.allCases.count
     }
 
     /// Clips that can be pinned on the library map.

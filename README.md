@@ -17,9 +17,9 @@ MP4 with the HUD burned in.
   streams, and total storage at a glance. Filter chips for **All / Sentry / Saved / Recent** plus
   trigger chips derived from `event.json` (**Motion / Impact / Honk / Saved by You**, offered only
   when clips of that kind exist), a date filter with presets and a custom range picker, search,
-  sorting by date/length/size/name, three card densities, and a **Grid / Map** switch that pins
+  sorting by date/category/length/size/name, three card densities, and a **Grid / Map** switch that pins
   every GPS-tagged clip on a real map. The gallery is sectioned — by day, event kind, or folder —
-  with sticky headers, because a real drive is hundreds of cards. Each card leads with what
+  with sticky headers (chosen in Settings → Playback), because a real drive is hundreds of cards. Each card leads with what
   happened (Motion / Impact / Honk / Manual) and carries its folder as a secondary chip.
 - **Synchronised multi-camera playback** — up to six feeds (front, rear, both repeaters, both
   B-pillars) each backed by its own `AVPlayer`, started at a shared host time and drift-corrected

@@ -272,31 +272,12 @@ struct LibraryView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(width: 96)
+                    .frame(width: 112)
                 }
                 .padding(.horizontal, 11)
                 .padding(.vertical, 5)
                 .background(Capsule().fill(Color.primary.opacity(0.04)))
                 .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-
-                HStack(spacing: 8) {
-                    Image(systemName: "rectangle.3.group")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Picker("", selection: $library.grouping) {
-                        ForEach(ClipGrouping.allCases) { option in
-                            Text(option.label).tag(option)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 92)
-                }
-                .padding(.horizontal, 11)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(Color.primary.opacity(0.04)))
-                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-                .onChange(of: library.grouping) { _, _ in library.persistGrouping() }
 
                 CapsuleSegments(
                     options: GalleryDensity.allCases.map { ($0, $0.label, $0.symbolName) },
