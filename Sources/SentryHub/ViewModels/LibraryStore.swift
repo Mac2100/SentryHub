@@ -54,6 +54,40 @@ enum GalleryDensity: String, CaseIterable, Identifiable {
     }
 }
 
+/// How the gallery is broken into sections.
+enum ClipGrouping: String, CaseIterable, Identifiable {
+    case day, event, category, none
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .day: return "Day"
+        case .event: return "Event"
+        case .category: return "Folder"
+        case .none: return "None"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .day: return "calendar"
+        case .event: return "bolt.badge.clock"
+        case .category: return "folder"
+        case .none: return "square.grid.2x2"
+        }
+    }
+}
+
+/// One section of the gallery.
+struct ClipGroup: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String?
+    let symbolName: String
+    let clips: [Clip]
+}
+
 /// Presets for the library's date filter.
 enum DateRangePreset: String, CaseIterable, Identifiable {
     case any, today, week, month, custom
@@ -97,6 +131,7 @@ final class LibraryStore: ObservableObject {
     @Published var sortOrder: LibrarySortOrder = .date
     @Published var presentation: LibraryPresentation = .grid
     @Published var density: GalleryDensity = .regular
+    @Published var grouping: ClipGrouping = .day
 
     // Date filter
     @Published var datePreset: DateRangePreset = .any
@@ -111,6 +146,10 @@ final class LibraryStore: ObservableObject {
         if let stored = UserDefaults.standard.string(forKey: "galleryDensity"),
            let value = GalleryDensity(rawValue: stored) {
             density = value
+        }
+        if let stored = UserDefaults.standard.string(forKey: "galleryGrouping"),
+           let value = ClipGrouping(rawValue: stored) {
+            grouping = value
         }
     }
 
@@ -333,5 +372,84 @@ final class LibraryStore: ObservableObject {
 
     func persistDensity() {
         UserDefaults.standard.set(density.rawValue, forKey: "galleryDensity")
+    }
+
+    func persistGrouping() {
+        UserDefaults.standard.set(grouping.rawValue, forKey: "galleryGrouping")
+    }
+
+    // MARK: - Grouping
+
+    /// The filtered clips broken into sections. A drive's worth of Sentry
+    /// events is hundreds of cards; sections make that scannable.
+    var groups: [ClipGroup] {
+        let clips = filteredClips
+        guard !clips.isEmpty else { return [] }
+
+        switch grouping {
+        case .none:
+            return [ClipGroup(
+                id: "all", title: "All Clips", subtitle: nil,
+                symbolName: "square.grid.2x2", clips: clips
+            )]
+
+        case .day:
+            let calendar = Calendar.current
+            let buckets = Dictionary(grouping: clips) {
+                calendar.startOfDay(for: $0.startDate)
+            }
+            return buckets.keys.sorted(by: >).map { day in
+                let items = buckets[day] ?? []
+                return ClipGroup(
+                    id: "day-\(day.timeIntervalSince1970)",
+                    title: Self.dayTitle(day, calendar: calendar),
+                    subtitle: Self.groupSubtitle(items),
+                    symbolName: "calendar",
+                    clips: items.sorted { $0.startDate > $1.startDate }
+                )
+            }
+
+        case .event:
+            let buckets = Dictionary(grouping: clips) { $0.trigger }
+            let order: [ClipTrigger?] = ClipTrigger.allCases.map { $0 } + [nil]
+            return order.compactMap { trigger in
+                guard let items = buckets[trigger], !items.isEmpty else { return nil }
+                return ClipGroup(
+                    id: "event-\(trigger?.rawValue ?? "other")",
+                    title: trigger?.label ?? "No Event Recorded",
+                    subtitle: Self.groupSubtitle(items),
+                    symbolName: trigger?.symbolName ?? "questionmark.circle",
+                    clips: items.sorted { $0.startDate > $1.startDate }
+                )
+            }
+
+        case .category:
+            let buckets = Dictionary(grouping: clips) { $0.category }
+            return ClipCategory.allCases.compactMap { category in
+                guard let items = buckets[category], !items.isEmpty else { return nil }
+                return ClipGroup(
+                    id: "category-\(category.rawValue)",
+                    title: category.label,
+                    subtitle: Self.groupSubtitle(items),
+                    symbolName: category.symbolName,
+                    clips: items.sorted { $0.startDate > $1.startDate }
+                )
+            }
+        }
+    }
+
+    private static func dayTitle(_ day: Date, calendar: Calendar) -> String {
+        if calendar.isDateInToday(day) { return "Today" }
+        if calendar.isDateInYesterday(day) { return "Yesterday" }
+        if let week = calendar.date(byAdding: .day, value: -7, to: Date()), day > week {
+            return day.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
+        }
+        return day.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().year())
+    }
+
+    private static func groupSubtitle(_ clips: [Clip]) -> String {
+        let count = clips.count
+        let bytes = clips.reduce(Int64(0)) { $0 + $1.byteCount }
+        return "\(count) clip\(count == 1 ? "" : "s") · \(Format.bytes(bytes))"
     }
 }

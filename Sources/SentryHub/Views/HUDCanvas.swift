@@ -29,10 +29,6 @@ struct HUDCanvas: View {
     var availability: TelemetryAvailability = TelemetryAvailability()
     /// Map tiles for the mini map, when a snapshot could be produced.
     var mapBackdrop: MapBackdrop?
-    /// The moment the car flagged, and why — drives the event flash.
-    var event: (offset: TimeInterval, trigger: ClipTrigger?)?
-    /// Play head, used to decide when the event flash is showing.
-    var currentTime: TimeInterval = 0
     var context: Context = .live
 
     /// An element draws when it's switched on and either has data or auto-hide
@@ -52,15 +48,6 @@ struct HUDCanvas: View {
     private var showsLocation: Bool { shows(config.location, "location") }
     private var showsTurnSignals: Bool { shows(config.turnSignals, "turnSignals") }
     private var showsCompass: Bool { shows(config.compassCoords, "compass") }
-
-    /// The flash is only on screen for a couple of seconds either side of the
-    /// moment the car flagged.
-    private var eventFlashIntensity: Double {
-        guard shows(config.eventFlash, "eventFlash"), let event else { return 0 }
-        let distance = abs(currentTime - event.offset)
-        guard distance < 2.0 else { return 0 }
-        return 1 - (distance / 2.0)
-    }
 
     /// Everything scales off a 1600×900 reference so the HUD looks the same at
     /// any window size or export resolution.
@@ -89,10 +76,6 @@ struct HUDCanvas: View {
                            alignment: config.mapCorner.alignment)
                     .padding(inset)
             }
-
-            eventFlash
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.top, inset + 62 * unit)
 
             timestampBlock
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -324,34 +307,6 @@ struct HUDCanvas: View {
                 }
             }
             .shadow(color: .black.opacity(0.5), radius: 4 * unit)
-        }
-    }
-
-    /// HORN / IMPACT / MOTION as the play head crosses the event.
-    @ViewBuilder
-    private var eventFlash: some View {
-        let intensity = eventFlashIntensity
-        if intensity > 0, let event {
-            let tint = Color(red: 1.0, green: 0.42, blue: 0.30)
-            HStack(spacing: 8 * unit) {
-                Image(systemName: event.trigger?.symbolName ?? "diamond.fill")
-                    .font(.system(size: 17 * unit, weight: .semibold))
-                Text(event.trigger?.badgeLabel ?? "EVENT")
-                    .font(.system(size: 16 * unit, weight: .bold, design: .rounded))
-                    .tracking(2 * unit)
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16 * unit)
-            .padding(.vertical, 8 * unit)
-            .background(
-                Capsule().fill(tint.opacity(0.30 + 0.45 * intensity))
-            )
-            .overlay(
-                Capsule().strokeBorder(tint.opacity(0.4 + 0.6 * intensity), lineWidth: 1.5 * unit)
-            )
-            .shadow(color: tint.opacity(0.6 * intensity), radius: 14 * unit)
-            .scaleEffect(1 + 0.06 * intensity)
-            .opacity(0.35 + 0.65 * intensity)
         }
     }
 

@@ -279,6 +279,25 @@ struct LibraryView: View {
                 .background(Capsule().fill(Color.primary.opacity(0.04)))
                 .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
 
+                HStack(spacing: 8) {
+                    Image(systemName: "rectangle.3.group")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Picker("", selection: $library.grouping) {
+                        ForEach(ClipGrouping.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 92)
+                }
+                .padding(.horizontal, 11)
+                .padding(.vertical, 5)
+                .background(Capsule().fill(Color.primary.opacity(0.04)))
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+                .onChange(of: library.grouping) { _, _ in library.persistGrouping() }
+
                 CapsuleSegments(
                     options: GalleryDensity.allCases.map { ($0, $0.label, $0.symbolName) },
                     selection: $library.density,
@@ -312,6 +331,11 @@ struct LibraryView: View {
             HStack(spacing: 8) {
                 Text("Showing \(library.filteredClips.count) clip\(library.filteredClips.count == 1 ? "" : "s")")
                     .font(.system(size: 14, weight: .medium))
+                if library.grouping != .none, library.groups.count > 1 {
+                    Text("in \(library.groups.count) groups")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
                 if library.isScanning {
                     ProgressView().controlSize(.small)
                 }
@@ -338,23 +362,58 @@ struct LibraryView: View {
                 }
                 .frame(minHeight: 480)
             } else {
-                LazyVGrid(
-                    columns: [
-                        GridItem(
-                            .adaptive(minimum: library.density.minimumCardWidth),
-                            spacing: 16
-                        )
-                    ],
-                    spacing: 16
-                ) {
-                    ForEach(library.filteredClips) { clip in
-                        ClipCard(clip: clip, density: library.density) {
-                            appState.open(clip)
+                LazyVStack(alignment: .leading, spacing: 26, pinnedViews: [.sectionHeaders]) {
+                    ForEach(library.groups) { group in
+                        Section {
+                            LazyVGrid(
+                                columns: [
+                                    GridItem(
+                                        .adaptive(minimum: library.density.minimumCardWidth),
+                                        spacing: 16
+                                    )
+                                ],
+                                spacing: 16
+                            ) {
+                                ForEach(group.clips) { clip in
+                                    ClipCard(clip: clip, density: library.density) {
+                                        appState.open(clip)
+                                    }
+                                }
+                            }
+                        } header: {
+                            groupHeader(group)
                         }
                     }
                 }
             }
         }
+    }
+
+    /// Sticky section header — the gallery runs to hundreds of cards on a real
+    /// drive, so the heading needs to stay visible while scrolling through one.
+    private func groupHeader(_ group: ClipGroup) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: group.symbolName)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(theme.primary)
+                .frame(width: 24, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(theme.primary.opacity(0.14))
+                )
+            Text(group.title)
+                .font(.system(size: 15, weight: .semibold))
+            if let subtitle = group.subtitle {
+                Text(subtitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
     private func emptyState(message: String) -> some View {

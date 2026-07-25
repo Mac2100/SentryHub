@@ -173,9 +173,6 @@ struct HUDConfiguration: Codable, Equatable {
     var location: Bool = false
     var turnSignals: Bool = true
     var compassCoords: Bool = false
-    /// Flashes what the car flagged — HORN, IMPACT, MOTION — as the play head
-    /// passes the moment recorded in `event.json`.
-    var eventFlash: Bool = true
 
     // Units
     var showKMH: Bool = true
@@ -244,9 +241,7 @@ struct HUDConfiguration: Codable, Equatable {
         .init(id: "turnSignals", label: "Turn Signals", symbol: "arrow.triangle.branch",
               keyPath: \.turnSignals),
         .init(id: "compass", label: "Compass & Coords", symbol: "location.circle",
-              keyPath: \.compassCoords),
-        .init(id: "eventFlash", label: "Event / Horn Flash", symbol: "speaker.wave.2.fill",
-              keyPath: \.eventFlash)
+              keyPath: \.compassCoords)
     ]
 
     static let unitOrder: [Element] = [
