@@ -156,8 +156,15 @@ final class PlayerModel: ObservableObject {
         // buffer wrapped around a few seconds that matter.
         let opening = openingPosition
         if opening > 0 { seek(to: opening) }
-        // And start rolling: you opened a clip to watch it.
-        if Self.autoPlaysOnOpen { play() }
+        // And start rolling: you opened a clip to watch it. The compositions
+        // exist by now but the feeds are not yet playable, so this waits —
+        // handing an unready item to setRate(_:time:atHostTime:) raises.
+        if Self.autoPlaysOnOpen {
+            await waitForFeeds()
+            // Closing the clip mid-wait cancels this task and tears the players
+            // down; don't start playing something that's already gone.
+            if !Task.isCancelled { play() }
+        }
 
         let loaded = await TelemetryLoader.load(for: clip)
         telemetry = loaded
@@ -276,11 +283,31 @@ final class PlayerModel: ObservableObject {
         isPlaying ? pause() : play()
     }
 
+    /// True once every feed can be handed a shared start instant.
+    ///
+    /// `setRate(_:time:atHostTime:)` raises an Objective-C exception — which
+    /// Swift cannot catch — when an item isn't ready to play. Anything that can
+    /// start playback has to check first.
+    private var allFeedsReady: Bool {
+        players.values.allSatisfy { $0.currentItem?.status == .readyToPlay }
+    }
+
     func play() {
         guard !players.isEmpty else { return }
         // Restart from the trim start once the head is parked at the end.
         if currentTime >= trimEnd - 0.05 {
             seek(to: trimStart)
+        }
+
+        guard allFeedsReady else {
+            // Start them the plain way rather than risk the exception. They may
+            // begin a few frames apart; the drift check pulls them back
+            // together within a couple of seconds.
+            for player in players.values {
+                player.rate = Float(playbackRate)
+            }
+            isPlaying = true
+            return
         }
 
         let start = CMTime(seconds: currentTime, preferredTimescale: 600)
@@ -291,6 +318,19 @@ final class PlayerModel: ObservableObject {
             player.setRate(Float(playbackRate), time: start, atHostTime: hostTime)
         }
         isPlaying = true
+    }
+
+    /// Waits for the feeds to become playable, so autoplay gets the properly
+    /// synchronised start rather than the fallback. Bounded, because a file the
+    /// system can't decode never reports ready and the wait must still end.
+    private func waitForFeeds(upTo limit: TimeInterval = 4) async {
+        let step: UInt64 = 50_000_000
+        var waited: TimeInterval = 0
+        while !allFeedsReady, waited < limit {
+            try? await Task.sleep(nanoseconds: step)
+            waited += Double(step) / 1_000_000_000
+            if Task.isCancelled { return }
+        }
     }
 
     func pause() {
@@ -311,8 +351,10 @@ final class PlayerModel: ObservableObject {
         for player in players.values {
             player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
         }
-        if isPlaying {
-            // Re-arm the shared start instant so the feeds don't drift apart.
+        // Re-arm the shared start instant so the feeds don't drift apart —
+        // but only once they can all take one. The same exception applies here
+        // as in `play()`, and playback can now be running before they're ready.
+        if isPlaying, allFeedsReady {
             let hostTime = CMClockGetTime(CMClockGetHostTimeClock())
                 + CMTime(seconds: 0.15, preferredTimescale: 600)
             for player in players.values {
