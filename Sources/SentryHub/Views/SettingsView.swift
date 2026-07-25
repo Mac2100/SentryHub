@@ -147,6 +147,7 @@ struct AppearanceSettingsView: View {
 struct PlaybackSettingsView: View {
     @AppStorage("defaultLayout") private var defaultLayout = CameraLayout.six.rawValue
     @AppStorage("galleryDensity") private var galleryDensity = GalleryDensity.regular.rawValue
+    @AppStorage("eventPreRoll") private var eventPreRoll = 5.0
 
     var body: some View {
         Form {
@@ -159,6 +160,25 @@ struct PlaybackSettingsView: View {
                 ForEach(GalleryDensity.allCases) { density in
                     Text(density.label).tag(density.rawValue)
                 }
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Event run-up")
+                        Spacer()
+                        Text(eventPreRoll < 1
+                             ? "None"
+                             : "\(Int(eventPreRoll))s before")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Slider(value: $eventPreRoll, in: 0...15, step: 1)
+                }
+            } footer: {
+                Text("How far ahead of the flagged moment the event jump lands — for any event, whether it was motion, an impact, the horn, or a manual save.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Keyboard") {
