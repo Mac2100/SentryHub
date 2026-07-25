@@ -19,6 +19,9 @@ struct RouteMiniMap: View {
     /// Scales every stroke and radius with the HUD.
     var unit: CGFloat = 1
 
+    /// Whether the car actually moved, as far as the recorded fixes know.
+    private var hasRoute: Bool { route.describesRoute }
+
     private var palette: Palette {
         switch config.mapTheme {
         case .dark:
@@ -91,7 +94,7 @@ struct RouteMiniMap: View {
                     .stroke(colors.grid, lineWidth: 0.75 * unit)
                 }
 
-                if points.count > 1, config.mapTrackStyle != .hidden {
+                if hasRoute, points.count > 1, config.mapTrackStyle != .hidden {
                     if config.mapTrackStyle == .full {
                         line(points)
                             .stroke(
@@ -109,14 +112,14 @@ struct RouteMiniMap: View {
                         )
                 }
 
-                if config.mapShowEndpoints, points.count > 1 {
+                if config.mapShowEndpoints, hasRoute, points.count > 1 {
                     Circle()
                         .fill(Color(red: 0.30, green: 0.85, blue: 0.45))
                         .frame(width: 6 * unit, height: 6 * unit)
                         .position(points[points.count - 1])
                 }
 
-                if points.count > 1, let marker = currentPoint(points) {
+                if hasRoute, points.count > 1, let marker = currentPoint(points) {
                     ZStack {
                         Circle()
                             .fill(Color(red: 0.20, green: 0.55, blue: 1.0))
@@ -137,13 +140,15 @@ struct RouteMiniMap: View {
                         .font(.system(size: 8 * unit, weight: .semibold))
                         .tracking(1)
                         .foregroundStyle(colors.ink.opacity(0.45))
-                } else if points.count == 1 {
-                    // A single event.json fix: a pin says more than a bare dot.
+                } else if !hasRoute, let only = points.first {
+                    // A single event.json fix, however many times it was repeated:
+                    // a pin says more than a bare dot, and there is no car to
+                    // move along a route that was never recorded.
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 16 * unit))
                         .foregroundStyle(Color(red: 1.0, green: 0.35, blue: 0.30))
                         .shadow(color: .black.opacity(0.5), radius: 2 * unit)
-                        .position(points[0])
+                        .position(only)
                 }
 
                 if config.mapShowLabel {

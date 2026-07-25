@@ -96,7 +96,8 @@ struct CameraTile: View {
     let camera: CameraAngle?
     let player: AVPlayer?
     let isFocused: Bool
-    /// The camera the car says triggered the event.
+    /// The camera the car says triggered the event — and only while the trace
+    /// is warranted and the play head is near the moment it marks.
     let isEventCamera: Bool
     /// 0…1, rising as the play head approaches the event.
     let eventUrgency: Double
@@ -203,7 +204,8 @@ struct CameraGridView: View {
                         camera: tile.camera,
                         player: tile.camera.flatMap { model.players[$0] },
                         isFocused: tile.camera == model.focusedCamera && model.layout != .single,
-                        isEventCamera: tile.camera != nil
+                        isEventCamera: model.showsEventTrace
+                            && tile.camera != nil
                             && tile.camera == model.clip.event?.triggerCamera,
                         eventUrgency: model.eventUrgency,
                         showWatermark: config.watermark

@@ -395,6 +395,27 @@ final class PlayerModel: ObservableObject {
     /// True while the play head is inside the window the event flash covers.
     var isNearEvent: Bool { eventUrgency > 0 }
 
+    /// Whether the loud tile highlight is warranted for this clip at all.
+    ///
+    /// It exists to say *look here* — so it's reserved for the car noticing
+    /// something on its own: Sentry motion and impacts. A horn press or a
+    /// manual save is the driver already knowing what happened, and a driving
+    /// clip has nothing in particular to point at. A highlight that shows on
+    /// every clip is one nobody reads, which makes it worse than none.
+    var deservesEventTrace: Bool {
+        guard clip.event?.triggerCamera != nil, eventOffset != nil else { return false }
+        switch clip.trigger {
+        case .motion, .impact: return true
+        case .honk, .manualSave, .none: return false
+        }
+    }
+
+    /// The trace is on screen only around the moment it's pointing at, so it
+    /// arrives as the thing happens rather than burning for ten minutes.
+    var showsEventTrace: Bool {
+        deservesEventTrace && eventUrgency > 0
+    }
+
     /// 0…1, rising as the play head closes on the event. Drives how fast and
     /// bright the event camera's trace pulses.
     var eventUrgency: Double {

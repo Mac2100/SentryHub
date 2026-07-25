@@ -64,7 +64,10 @@ and exports a range to MP4 with the HUD burned in.
   Theme (Dark / Light / Satellite), Rotation (Heading / North Up), Zoom level, Size (S / M / L), and
   Route Overview; corner, route line, endpoint markers, label, export inclusion, and opacity live in
   Settings → HUD. Real map tiles are snapshotted once per clip and sit under the route, so a clip
-  whose only fix is the one in `event.json` still shows where it happened. Behind the same button
+  whose only fix is the one in `event.json` still shows where it happened — as a **single pin**,
+  said plainly, rather than a route line and a pair of start/finish flags stacked on one address.
+  Tesla records one position per clip and nothing per second, so most clips have no route to follow;
+  drop in a [sidecar](#sidecar-schema) and the map moves. Behind the same button
   sits a fully interactive route map whose camera follows the play head — or frames the whole drive
   when Route Overview is on.
 - **Trim & export** — set IN and OUT points on the timeline, then export the current grid to MP4.
@@ -72,8 +75,11 @@ and exports a range to MP4 with the HUD burned in.
   exports the current frame as a PNG.
 - **Event focus** — the moment the car flagged (Sentry trigger, horn, manual save) is marked on the
   timeline and reachable with one click or the `E` key, landing a few seconds early — for any event
-  kind — so the lead-in is visible; the run-up is adjustable in Settings → Playback. The camera that saw it is traced with a pulsing highlight that quickens as the play head
-  closes in.
+  kind — so the lead-in is visible; the run-up is adjustable in Settings → Playback. The camera that
+  saw it is traced with a pulsing highlight that quickens as the play head closes in — but only for
+  a **Sentry motion or impact**, and only in the seconds around the event itself. A horn press or a
+  manual save is the driver already knowing what happened, and a highlight shown on every clip is
+  one nobody reads.
 - **Themes & appearance** — six accent themes and a System/Light/Dark override.
 - **One-click updates** — an optional launch check against GitHub Releases; installing downloads
   the DMG, swaps the app in place, and relaunches.
