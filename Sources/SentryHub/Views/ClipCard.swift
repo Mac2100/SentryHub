@@ -184,8 +184,14 @@ struct ClipCard: View {
         .padding(.top, 6)
     }
 
-    /// Sits quietly in the corner until it's wanted, then fills in. Clicking it
-    /// is what puts the library into selection mode.
+    /// Hidden until the pointer is over the card, so a quiet gallery stays
+    /// quiet. Once anything is selected it shows on every card at once —
+    /// otherwise adding the second clip to a selection would mean hunting for
+    /// an invisible target.
+    private var showsSelectionToggle: Bool {
+        isSelected || isSelecting || isHovering
+    }
+
     private var selectionToggle: some View {
         Button(action: onToggleSelection) {
             ZStack {
@@ -206,7 +212,8 @@ struct ClipCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .opacity(isSelected || isSelecting || isHovering ? 1 : 0.55)
+        .opacity(showsSelectionToggle ? 1 : 0)
+        .allowsHitTesting(showsSelectionToggle)
         .help(isSelected ? "Deselect this clip" : "Select this clip")
     }
 
