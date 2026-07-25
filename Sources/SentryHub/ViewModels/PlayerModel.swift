@@ -154,9 +154,7 @@ final class PlayerModel: ObservableObject {
 
         let loaded = await TelemetryLoader.load(for: clip)
         telemetry = loaded
-        availability = TelemetryAvailability(
-            track: loaded, hasCity: clip.city != nil, hasEvent: clip.eventOffset != nil
-        )
+        availability = TelemetryAvailability(track: loaded, hasCity: clip.city != nil)
     }
 
     /// Stitches one camera's segments into a single continuous track.

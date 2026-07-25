@@ -148,6 +148,7 @@ struct PlaybackSettingsView: View {
     @AppStorage("defaultLayout") private var defaultLayout = CameraLayout.six.rawValue
     @AppStorage("galleryDensity") private var galleryDensity = GalleryDensity.regular.rawValue
     @AppStorage("eventPreRoll") private var eventPreRoll = 5.0
+    @AppStorage("galleryGrouping") private var galleryGrouping = ClipGrouping.day.rawValue
 
     var body: some View {
         Form {
@@ -159,6 +160,11 @@ struct PlaybackSettingsView: View {
             Picker("Gallery card size", selection: $galleryDensity) {
                 ForEach(GalleryDensity.allCases) { density in
                     Text(density.label).tag(density.rawValue)
+                }
+            }
+            Picker("Group the gallery by", selection: $galleryGrouping) {
+                ForEach(ClipGrouping.allCases) { option in
+                    Text(option.label).tag(option.rawValue)
                 }
             }
 

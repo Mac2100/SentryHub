@@ -394,8 +394,6 @@ final class ExportService: ObservableObject {
                 progress: clip.duration > 0 ? clipTime / clip.duration : 0,
                 availability: availability,
                 mapBackdrop: mapBackdrop,
-                event: clip.eventOffset.map { ($0, clip.trigger) },
-                currentTime: clipTime,
                 context: .export
             )
 
@@ -665,8 +663,6 @@ final class ExportService: ObservableObject {
                 progress: clip.duration > 0 ? time / clip.duration : 0,
                 availability: availability,
                 mapBackdrop: mapBackdrop,
-                event: clip.eventOffset.map { ($0, clip.trigger) },
-                currentTime: time,
                 context: .export
             )
             let renderer = ImageRenderer(content: canvas)

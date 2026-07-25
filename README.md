@@ -18,7 +18,9 @@ MP4 with the HUD burned in.
   trigger chips derived from `event.json` (**Motion / Impact / Honk / Saved by You**, offered only
   when clips of that kind exist), a date filter with presets and a custom range picker, search,
   sorting by date/length/size/name, three card densities, and a **Grid / Map** switch that pins
-  every GPS-tagged clip on a real map.
+  every GPS-tagged clip on a real map. The gallery is sectioned — by day, event kind, or folder —
+  with sticky headers, because a real drive is hundreds of cards. Each card leads with what
+  happened (Motion / Impact / Honk / Manual) and carries its folder as a secondary chip.
 - **Synchronised multi-camera playback** — up to six feeds (front, rear, both repeaters, both
   B-pillars) each backed by its own `AVPlayer`, started at a shared host time and drift-corrected
   every two seconds. A Sentry event's ~60-second segments are stitched into one continuous
@@ -43,7 +45,7 @@ MP4 with the HUD burned in.
 - **Event focus** — the moment the car flagged (Sentry trigger, horn, manual save) is marked on the
   timeline and reachable with one click or the `E` key, landing a few seconds early — for any event
   kind — so the lead-in is visible; the run-up is adjustable in Settings → Playback. The camera that saw it is traced with a pulsing highlight that quickens as the play head
-  closes in, and the HUD flashes what happened as it passes.
+  closes in.
 - **Themes & appearance** — six accent themes and a System/Light/Dark override.
 - **One-click updates** — an optional launch check against GitHub Releases; installing downloads
   the DMG, swaps the app in place, and relaunches.

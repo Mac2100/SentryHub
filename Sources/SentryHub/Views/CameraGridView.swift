@@ -164,20 +164,6 @@ struct CameraTile: View {
                     )
             }
         }
-        .overlay(alignment: .topLeading) {
-            if isEventCamera, player != nil {
-                Text("EVENT")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.1)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(
-                        Capsule().fill(Color(red: 1.0, green: 0.42, blue: 0.30).opacity(0.85))
-                    )
-                    .padding(8)
-            }
-        }
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { onSelect() }
     }
@@ -238,8 +224,6 @@ struct CameraGridView: View {
                     progress: model.duration > 0 ? model.currentTime / model.duration : 0,
                     availability: model.availability,
                     mapBackdrop: model.mapBackdrop,
-                    event: model.eventOffset.map { ($0, model.clip.trigger) },
-                    currentTime: model.currentTime,
                     context: .live
                 )
             }

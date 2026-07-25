@@ -76,14 +76,18 @@ struct ClipCard: View {
             }
 
             VStack {
+                // What happened leads; which folder it came from is secondary.
                 HStack(spacing: 6) {
-                    categoryBadge
                     if let trigger = clip.trigger {
                         triggerBadge(trigger)
+                        categoryChip
                     } else if let reason = clip.event?.reasonLabel {
                         // Tesla has shipped reason strings we don't classify. Show
                         // them anyway rather than dropping the badge silently.
                         genericEventBadge(reason)
+                        categoryChip
+                    } else {
+                        categoryBadge
                     }
                     durationChip
                     Spacer()
@@ -182,6 +186,22 @@ struct ClipCard: View {
         case .honk: return Color(red: 0.46, green: 0.30, blue: 0.72)
         case .manualSave: return Color(red: 0.16, green: 0.46, blue: 0.44)
         }
+    }
+
+    /// Compact form of the category, used when the trigger badge is leading.
+    private var categoryChip: some View {
+        HStack(spacing: 3) {
+            Image(systemName: clip.category.symbolName)
+                .font(.system(size: 8, weight: .semibold))
+            Text(clip.category.label.uppercased())
+                .font(.system(size: 8, weight: .semibold))
+                .tracking(0.6)
+        }
+        .foregroundStyle(.white.opacity(0.85))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(Color.black.opacity(0.5)))
+        .overlay(Capsule().strokeBorder(badgeColor.opacity(0.8), lineWidth: 1))
     }
 
     private var badgeColor: Color {
