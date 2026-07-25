@@ -93,6 +93,11 @@ struct GeneralSettingsView: View {
             Section {
                 Toggle("Rescan when the app becomes active", isOn: $rescanOnActivate)
                 Toggle("Show in-app notifications", isOn: $showToasts)
+                HStack {
+                    Text("Walkthrough")
+                    Spacer()
+                    Button("Show Again") { TourController.shared.start() }
+                }
             } footer: {
                 Text("SentryHub never uploads footage. Everything is read straight from the folder you pick; the only network request is the optional update check.")
                     .font(.caption)

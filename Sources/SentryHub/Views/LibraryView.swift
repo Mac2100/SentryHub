@@ -30,6 +30,16 @@ struct LibraryView: View {
         }
         .background(backdrop)
         .overlay(alignment: .bottom) { TransferBanner() }
+        .overlayPreferenceValue(TourAnchorKey.self) { anchors in
+            TourOverlay(anchors: anchors)
+        }
+        .task {
+            // A beat for the first layout to settle, so the highlight lands on
+            // where the controls actually ended up.
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard appState.libraryTab == .clips else { return }
+            TourController.shared.startIfUnseen()
+        }
         .sheet(isPresented: $showRenameSheet) {
             BulkRenameSheet(count: library.selection.count) { name in
                 library.renameSelection(to: name)
@@ -97,6 +107,7 @@ struct LibraryView: View {
                     options: AppState.LibraryTab.allCases.map { ($0, $0.label, $0.symbolName) },
                     selection: $appState.libraryTab
                 )
+                .tourAnchor(.tabs)
 
                 Button {
                     appState.showStartScreen()
@@ -195,6 +206,7 @@ struct LibraryView: View {
                     tint: Color(red: 0.80, green: 0.60, blue: 0.16)
                 )
             }
+            .tourAnchor(.stats)
         }
     }
 
@@ -323,6 +335,7 @@ struct LibraryView: View {
 
                 Spacer()
             }
+            .tourAnchor(.filters)
 
             HStack(spacing: 12) {
                 SearchField(text: $library.searchText, prompt: "Search by city, street or event")
@@ -359,6 +372,7 @@ struct LibraryView: View {
                     options: LibraryPresentation.allCases.map { ($0, $0.label, $0.symbolName) },
                     selection: $library.presentation
                 )
+                .tourAnchor(.presentation)
             }
 
             HStack(spacing: 12) {
@@ -375,6 +389,7 @@ struct LibraryView: View {
                         selection: $library.storageFilter
                     )
                 }
+                .tourAnchor(.storage)
 
                 if library.driveOnlyCount > 0 {
                     Text("\(library.driveOnlyCount) clip\(library.driveOnlyCount == 1 ? "" : "s") "
@@ -546,6 +561,10 @@ struct LibraryView: View {
     // MARK: - Gallery
 
     private var gallery: some View {
+        galleryBody.tourAnchor(.gallery)
+    }
+
+    private var galleryBody: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionCaption(text: "CLIP GALLERY")
 

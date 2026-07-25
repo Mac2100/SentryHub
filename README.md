@@ -83,6 +83,12 @@ and exports a range to MP4 with the HUD burned in.
   fades once it has passed — but only for a **Sentry motion or impact**. A horn press or a
   manual save is the driver already knowing what happened, and a highlight shown on every clip is
   one nobody reads.
+- **First-run walkthrough** — the first time the library opens, the window dims and each part is
+  ringed in turn with a sentence explaining it: the two tabs, the stat row, the folder-and-reason
+  chips, the storage filter, the Grid/List/Map switch, and the gallery. Click anywhere to move on,
+  Skip to leave, and **Settings → General → Walkthrough → Show Again** to see it later. The
+  highlights are anchored to the real controls, so they follow them as the window resizes and as
+  chips appear and disappear with the library's contents.
 - **Themes & appearance** — six accent themes and a System/Light/Dark override.
 - **One-click updates** — an optional launch check against GitHub Releases; installing downloads
   the DMG, swaps the app in place, and relaunches.
