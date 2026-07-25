@@ -131,7 +131,6 @@ enum LibraryScanner {
             ?? segments[0].timestamp
 
         return Clip(
-            id: folder.path,
             category: category,
             name: name,
             directory: folder,
@@ -149,7 +148,6 @@ enum LibraryScanner {
         let segments = buildSegments(from: files, fm: fm)
         return segments.map { segment in
             Clip(
-                id: "\(directory.path)/\(segment.id)",
                 category: category,
                 name: segment.id,
                 directory: directory,

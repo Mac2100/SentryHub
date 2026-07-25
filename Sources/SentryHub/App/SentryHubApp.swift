@@ -19,6 +19,9 @@ struct SentryHubApp: App {
                 .frame(minWidth: 1080, minHeight: 700)
                 .task {
                     appState.updates.checkOnLaunchIfEnabled()
+                    // The local library first: it's small, it's always there,
+                    // and it's what the app has to show when no drive is.
+                    await LocalLibrary.shared.rescan()
                     await appState.library.restoreLastFolder()
                 }
         }
@@ -43,17 +46,26 @@ struct SentryHubApp: App {
                 .keyboardShortcut("o", modifiers: [.command])
 
                 Button("Rescan") {
-                    Task { await appState.library.rescan() }
+                    Task {
+                        await LocalLibrary.shared.rescan()
+                        await appState.library.rescan()
+                    }
                 }
                 .keyboardShortcut("r", modifiers: [.command])
-                .disabled(appState.library.rootURL == nil)
+
+                Divider()
+
+                Button("Clips") { appState.libraryTab = .clips }
+                    .keyboardShortcut("1", modifiers: [.command])
+                Button("Incidents") { appState.libraryTab = .incidents }
+                    .keyboardShortcut("2", modifiers: [.command])
 
                 Divider()
 
                 Button("Back to Start Screen") {
                     appState.showStartScreen()
                 }
-                .disabled(appState.library.rootURL == nil)
+                .disabled(!appState.hasLibrary)
             }
         }
 

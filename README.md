@@ -1,11 +1,12 @@
 # SentryHub
 
-An open-source, native **macOS** viewer for Tesla dashcam footage, built with SwiftUI.
+An open-source, native **macOS** library and viewer for Tesla dashcam footage, built with SwiftUI.
 
 SentryHub reads a TeslaCam drive entirely on your Mac: it organises Sentry, Saved, and Recent
-clips into a browsable library, plays every camera angle locked to one timeline, draws a fully
-customisable HUD over the picture, plots the drive on a map, and trims and exports a range to
-MP4 with the HUD burned in.
+clips into a browsable library, **keeps the ones that matter on your Mac after the drive is
+unplugged**, groups related clips into named incidents, plays every camera angle locked to one
+timeline, draws a fully customisable HUD over the picture, plots the drive on a map, and trims
+and exports a range to MP4 with the HUD burned in.
 
 ![SentryHub icon](Resources/icon_1024.png)
 
@@ -13,6 +14,22 @@ MP4 with the HUD burned in.
 
 ## Features
 
+- **A library, not a window onto a USB stick** — the dashcam drive is a rolling buffer: the car
+  overwrites it, and everything on it vanishes when you unplug it. Select clips and **Save to Mac**
+  to copy them into a local library that's still there tomorrow. The drive and the local copies are
+  merged into one gallery — one card per clip, labelled **Saved** or **Drive only** — with a
+  **Storage** filter for *Everywhere / On This Mac / Drive Only*. With no drive connected, SentryHub
+  opens straight into whatever you kept.
+- **Incidents** — a second tab where clips are grouped into the thing that actually happened: every
+  angle of one collision, under a name, with a claim or report number, notes, and an
+  Open / Submitted / Closed status. An incident tells you at a glance how many of its clips are
+  safely on your Mac, and offers to save the rest — because "the clips from the 3rd" is no use if
+  they were left on a drive the car has since overwritten.
+- **Multi-select** — **Select** turns the gallery into checkboxes: save a batch to the Mac, file it
+  into an incident, rename it in one go (one clip takes the name as typed; several get numbered),
+  remove local copies, or clear clips off the drive. Both destructive actions state exactly what
+  they'll destroy first — including the fact that dashcam drives have no Trash, so deleting off one
+  is permanent.
 - **Clip library** — the app opens straight into the gallery: clips loaded, GPS-tagged, camera
   streams, and total storage at a glance. Filter chips for **All / Sentry / Saved / Recent** plus
   trigger chips derived from `event.json` (**Motion / Impact / Honk / Saved by You**, offered only
@@ -54,6 +71,25 @@ MP4 with the HUD burned in.
 - **Local only** — footage never leaves your Mac. The single network request the app can make is
   the (off-switchable) update check.
 
+### Where saved clips go
+
+Clips you keep are copied into Application Support, in exactly the layout Tesla uses:
+
+```
+~/Library/Application Support/SentryHub/Library/
+  SentryClips/2026-07-24_11-27-41/{*.mp4, event.json, thumb.png}
+  SavedClips/…
+  RecentClips/2026-07-24_11-27-41-front.mp4, …
+```
+
+That's deliberate: the same scanner reads the drive and the local library, and what you keep stays
+a plain folder of MP4s that outlives SentryHub. **Settings → General → On This Mac** shows the size,
+reveals the folder in Finder, and can empty it. Incidents live beside it in `incidents.json`.
+
+Clip names and incident membership are keyed on the category and the timestamp the car wrote —
+never on a file path — so a clip you renamed keeps its name when it's copied to the Mac, and when
+the drive is remounted somewhere else.
+
 ## Installation
 
 ### Download
@@ -94,6 +130,9 @@ accepts the drive root, the `TeslaCam` folder itself, or any folder of clips you
 
 The chosen folder is remembered between launches. Click any card to open the player.
 
+Before you unplug the drive, hit **Select**, pick what's worth keeping, and choose **Save to Mac**.
+Those clips stay in the library — playable, searchable, and exportable — with nothing connected.
+
 ### Keyboard shortcuts
 
 | Key | Action |
@@ -108,6 +147,7 @@ The chosen folder is remembered between launches. Click any card to open the pla
 | `Esc` | Back to the library |
 | `⌘O` | Choose the TeslaCam folder |
 | `⌘R` | Rescan |
+| `⌘1` `⌘2` | Clips / Incidents tab |
 
 ## Telemetry
 

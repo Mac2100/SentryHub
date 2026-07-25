@@ -305,9 +305,52 @@ struct ClipSegment: Identifiable, Hashable {
     var cameras: Set<CameraAngle> { Set(files.keys) }
 }
 
+/// Where a clip's files live.
+///
+/// The dashcam drive is a rolling buffer: the car overwrites it, and everything
+/// on it disappears the moment it's unplugged. Knowing which side of that line a
+/// clip sits on is the single most useful thing the library can tell you.
+enum ClipStorage: String, CaseIterable, Identifiable, Codable, Hashable {
+    /// Only on the drive — it goes away when the drive does.
+    case device
+    /// Only in SentryHub's local library; the drive no longer has it.
+    case local
+    /// Copied to this Mac and still on the drive.
+    case both
+
+    var id: String { rawValue }
+
+    var isSavedLocally: Bool { self != .device }
+    var isOnDrive: Bool { self != .local }
+
+    var label: String {
+        switch self {
+        case .device: return "On the drive only"
+        case .local: return "Saved on this Mac"
+        case .both: return "Saved on this Mac and on the drive"
+        }
+    }
+
+    /// Chip text on a clip card.
+    var shortLabel: String {
+        switch self {
+        case .device: return "Drive only"
+        case .local: return "On this Mac"
+        case .both: return "Saved"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .device: return "externaldrive"
+        case .local: return "internaldrive.fill"
+        case .both: return "internaldrive.fill"
+        }
+    }
+}
+
 /// A single reviewable event: a Sentry/Saved folder, or one Recent recording.
 struct Clip: Identifiable, Hashable {
-    let id: String
     let category: ClipCategory
     /// `2025-12-21_20-59-54` — the folder name, or the segment prefix for Recent clips.
     let name: String
@@ -317,6 +360,37 @@ struct Clip: Identifiable, Hashable {
     var segments: [ClipSegment]
     var event: EventMetadata?
     var thumbnailURL: URL?
+    /// Filled in by `LibraryStore` when the drive and the local library are merged.
+    var storage: ClipStorage = .device
+
+    /// Deliberately derived from the category and the car's own name rather than
+    /// from the path. The same footage keeps one identity whether it's being
+    /// read off the drive or out of the local library — which is what lets the
+    /// two merge into a single card, and what renames and incidents key on.
+    var id: String { "\(category.rawValue)/\(name)" }
+
+    /// True when the clip owns the folder it sits in — a Sentry or Saved event.
+    ///
+    /// This distinction matters enormously for copying and deleting: a Recent
+    /// clip is loose files sharing `RecentClips` with every other recording on
+    /// the drive, so its "folder" is emphatically not its own.
+    var ownsDirectory: Bool {
+        directory.lastPathComponent == name
+    }
+
+    /// Everything on disk that belongs to this clip and to nothing else — what
+    /// a copy takes and what a delete is allowed to touch.
+    var storedItems: [URL] {
+        ownsDirectory ? [directory] : allFiles
+    }
+
+    /// Sidecar files that travel alongside a loose clip, when they exist.
+    var sidecarFileNames: [String] {
+        [
+            "\(name).telemetry.json", "\(name).json",
+            "\(name).telemetry.csv", "\(name).csv"
+        ]
+    }
 
     var byteCount: Int64 { segments.reduce(0) { $0 + $1.byteCount } }
     var duration: TimeInterval { segments.reduce(0) { $0 + $1.duration } }

@@ -5,10 +5,14 @@ import SwiftUI
 struct ClipCard: View {
     let clip: Clip
     let density: GalleryDensity
+    var isSelecting: Bool = false
+    var isSelected: Bool = false
+    var onToggleSelection: () -> Void = {}
     let onOpen: () -> Void
 
     @Environment(\.appTheme) private var theme
     @ObservedObject private var labels = ClipLabels.shared
+    @ObservedObject private var incidents = IncidentStore.shared
     @State private var poster: CGImage?
     @State private var previewCamera: CameraAngle?
     @State private var isHovering = false
@@ -26,6 +30,11 @@ struct ClipCard: View {
         }
     }
 
+    private var borderColor: Color {
+        if isSelected { return theme.primary }
+        return isHovering ? theme.primary.opacity(0.45) : Color.primary.opacity(0.08)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             thumbnail
@@ -37,20 +46,25 @@ struct ClipCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(
-                    isHovering ? theme.primary.opacity(0.45) : Color.primary.opacity(0.08),
-                    lineWidth: 1
-                )
+                .strokeBorder(borderColor, lineWidth: isSelected ? 2 : 1)
         )
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture {
-            if isRenaming { commitRename() } else { onOpen() }
+            if isRenaming {
+                commitRename()
+            } else if isSelecting {
+                onToggleSelection()
+            } else {
+                onOpen()
+            }
         }
         .onHover { isHovering = $0 }
         .animation(.easeOut(duration: 0.15), value: isHovering)
+        .animation(.easeOut(duration: 0.15), value: isSelected)
         .task(id: previewCamera) { await loadPoster() }
         .contextMenu {
             Button("Open in Player", action: onOpen)
+            Button(isSelected ? "Deselect" : "Select", action: onToggleSelection)
             Button("Rename…", action: beginRename)
             if labels.label(for: clip) != nil {
                 Button("Restore Original Name") {
@@ -58,6 +72,18 @@ struct ClipCard: View {
                 }
             }
             Divider()
+            if clip.storage.isSavedLocally {
+                Button("Remove from This Mac") {
+                    Task { await LocalLibrary.shared.remove([clip.id]) }
+                }
+            } else {
+                Button("Save to This Mac") {
+                    Task {
+                        guard let drive = AppState.shared.library.driveCopy(of: clip.id) else { return }
+                        await LocalLibrary.shared.save([drive])
+                    }
+                }
+            }
             Button("Reveal in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([clip.directory])
             }
@@ -104,6 +130,9 @@ struct ClipCard: View {
                     }
                     durationChip
                     Spacer()
+                    if isSelecting || isSelected {
+                        selectionToggle
+                    }
                 }
                 Spacer()
                 if cameras.count > 1 {
@@ -145,6 +174,25 @@ struct ClipCard: View {
         )
         .padding(.horizontal, 6)
         .padding(.top, 6)
+    }
+
+    private var selectionToggle: some View {
+        Button(action: onToggleSelection) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 19, weight: .medium))
+                .symbolRenderingMode(isSelected ? .palette : .monochrome)
+                .foregroundStyle(
+                    isSelected ? Color.white : Color.white.opacity(0.85),
+                    isSelected ? theme.primary : Color.clear
+                )
+                .background(
+                    Circle()
+                        .fill(Color.black.opacity(isSelected ? 0 : 0.35))
+                        .padding(2)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(isSelected ? "Deselect this clip" : "Select this clip")
     }
 
     private var categoryBadge: some View {
@@ -266,8 +314,14 @@ struct ClipCard: View {
             HStack(spacing: 6) {
                 infoChip(Format.bytes(clip.byteCount))
                 categoryPill
+                storagePill
             }
             .padding(.top, 2)
+
+            if let incident = incidents.incidents(containing: clip.id).first {
+                metaRow(symbol: "folder.badge.person.crop", text: incident.title)
+                    .help("Part of the “\(incident.title)” incident")
+            }
         }
         .padding(.horizontal, 14)
         .padding(.top, 12)
@@ -337,6 +391,36 @@ struct ClipCard: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .strokeBorder(badgeColor.opacity(0.35), lineWidth: 1)
         )
+    }
+
+    /// Whether this footage survives the drive being unplugged — the one thing
+    /// about a clip that changes what you'd do next.
+    private var storagePill: some View {
+        HStack(spacing: 4) {
+            Image(systemName: clip.storage.symbolName)
+                .font(.system(size: 9, weight: .semibold))
+            Text(clip.storage.shortLabel)
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .foregroundStyle(storageTint)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(storageTint.opacity(0.14))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(storageTint.opacity(0.35), lineWidth: 1)
+        )
+        .help(clip.storage.label)
+    }
+
+    private var storageTint: Color {
+        switch clip.storage {
+        case .device: return Color(red: 0.62, green: 0.45, blue: 0.10)
+        case .local, .both: return Color(red: 0.13, green: 0.55, blue: 0.40)
+        }
     }
 
     private var coordinateText: String? {

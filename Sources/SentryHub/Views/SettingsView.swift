@@ -25,12 +25,14 @@ struct SettingsView: View {
 
 struct GeneralSettingsView: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject private var local = LocalLibrary.shared
     @AppStorage("showToasts") private var showToasts = true
     @AppStorage("rescanOnActivate") private var rescanOnActivate = false
+    @State private var confirmEmptyVault = false
 
     var body: some View {
         Form {
-            Section("Library Folder") {
+            Section("Dashcam Drive") {
                 if let root = appState.library.rootURL {
                     LabeledContent("Folder") {
                         Text(root.path)
@@ -39,7 +41,7 @@ struct GeneralSettingsView: View {
                             .lineLimit(2)
                             .truncationMode(.middle)
                     }
-                    LabeledContent("Clips", value: "\(appState.library.clips.count)")
+                    LabeledContent("Clips on the drive", value: "\(appState.library.deviceClips.count)")
                 } else {
                     Text("No folder selected yet.")
                         .foregroundStyle(.secondary)
@@ -58,6 +60,34 @@ struct GeneralSettingsView: View {
                     }
                     .disabled(appState.library.rootURL == nil)
                 }
+            }
+
+            Section("On This Mac") {
+                LabeledContent("Saved clips", value: "\(local.clips.count)")
+                LabeledContent("Size", value: Format.bytes(local.totalBytes))
+                LabeledContent("Location") {
+                    Text(local.root.path)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                }
+                HStack {
+                    Button("Reveal in Finder") { local.revealInFinder() }
+                    Spacer()
+                    Button("Remove All…", role: .destructive) {
+                        confirmEmptyVault = true
+                    }
+                    .disabled(local.clips.isEmpty || local.transfer != nil)
+                }
+            }
+            .alert("Remove every saved clip?", isPresented: $confirmEmptyVault) {
+                Button("Remove All", role: .destructive) {
+                    Task { await local.removeEverything() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("\(local.clips.count) clips (\(Format.bytes(local.totalBytes))) are moved to the Trash. Anything still on the dashcam drive stays there.")
             }
 
             Section {
