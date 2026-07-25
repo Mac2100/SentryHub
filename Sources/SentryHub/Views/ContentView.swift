@@ -102,10 +102,24 @@ struct WelcomeView: View {
             }
             .padding(.top, 36)
 
-            Text("Pick the dashcam drive, its TeslaCam folder, or any folder of clips you copied off it.")
-                .font(.callout)
-                .foregroundStyle(.tertiary)
-                .padding(.top, 10)
+            if appState.library.isBuildingSample {
+                VStack(spacing: 5) {
+                    ProgressView(value: appState.library.sampleProgress)
+                        .progressViewStyle(.linear)
+                        .tint(theme.primary)
+                        .frame(width: 260)
+                    Text("Generating sample footage… \(Int(appState.library.sampleProgress * 100))%")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                .padding(.top, 14)
+            } else {
+                Text("Pick the dashcam drive, its TeslaCam folder, or any folder of clips you copied off it.")
+                    .font(.callout)
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 10)
+            }
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

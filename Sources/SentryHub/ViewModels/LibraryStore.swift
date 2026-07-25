@@ -64,6 +64,8 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var scanError: String?
     @Published private(set) var isUsingSampleLibrary = false
     @Published private(set) var isBuildingSample = false
+    /// 0…1 while the sample library is being generated.
+    @Published private(set) var sampleProgress: Double = 0
 
     // Filters
     @Published var categoryFilter: ClipCategory?
@@ -157,16 +159,22 @@ final class LibraryStore: ObservableObject {
 
     // MARK: - Sample library
 
-    func loadSampleLibrary() async {
+    func loadSampleLibrary(force: Bool = false) async {
         isBuildingSample = true
-        defer { isBuildingSample = false }
+        sampleProgress = 0
+        defer {
+            isBuildingSample = false
+            sampleProgress = 0
+        }
         do {
-            let root = try await SampleLibrary.build()
+            let root = try await SampleLibrary.build(force: force) { [weak self] fraction in
+                self?.sampleProgress = fraction
+            }
             FolderAccess.remember(root)
             await load(root: root, isSample: true)
             ToastCenter.shared.show(
                 "Sample library loaded",
-                detail: "Synthetic clips with demo telemetry — no dashcam needed"
+                detail: "\(clips.count) synthetic clips with demo telemetry"
             )
         } catch {
             scanError = error.localizedDescription
