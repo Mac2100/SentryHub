@@ -34,8 +34,9 @@ and exports a range to MP4 with the HUD burned in.
   streams, and total storage at a glance. Filter chips for **All / Saved / Sentry** plus
   trigger chips derived from `event.json` (**Motion / Impact / Honk / Saved by You**, offered only
   when clips of that kind exist), a date filter with presets and a custom range picker, search,
-  sorting by date/category/length/size/name, three card densities, and a **Grid / Map** switch that pins
-  every GPS-tagged clip on a real map. The gallery is sectioned — by day, event kind, or folder —
+  sorting by date/category/length/size/name, three card densities, and a **Grid / List / Map**
+  switch — the grid for recognising footage by sight, the list for scanning hundreds of clips by
+  their facts in aligned columns, the map for pinning every GPS-tagged clip on real tiles. The gallery is sectioned — by day, event kind, or folder —
   with sticky headers (chosen in Settings → Playback), because a real drive is hundreds of cards. Each card leads with what
   happened (Motion / Impact / Honk / Manual), shows the date, time, town, size, and folder,
   and can be **renamed** by clicking its title — the label is stored in the app, so the

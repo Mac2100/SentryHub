@@ -621,30 +621,57 @@ struct LibraryView: View {
                 }
                 .frame(minHeight: 480)
             } else {
-                LazyVStack(alignment: .leading, spacing: 26, pinnedViews: [.sectionHeaders]) {
+                if library.presentation == .list {
+                    ClipListHeader(
+                        isSelecting: library.isSelecting,
+                        thumbnailWidth: library.density.listThumbnailWidth
+                    )
+                }
+
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: library.presentation == .list ? 16 : 26,
+                    pinnedViews: [.sectionHeaders]
+                ) {
                     ForEach(library.groups) { group in
                         Section {
-                            LazyVGrid(
-                                columns: [
-                                    GridItem(
-                                        .adaptive(minimum: library.density.minimumCardWidth),
-                                        spacing: 16
-                                    )
-                                ],
-                                spacing: 16
-                            ) {
-                                ForEach(group.clips) { clip in
-                                    ClipCard(
-                                        clip: clip,
-                                        density: library.density,
-                                        isSelecting: library.isSelecting,
-                                        isSelected: library.selection.contains(clip.id),
-                                        onToggleSelection: {
-                                            library.beginSelecting()
-                                            library.toggleSelection(clip.id)
+                            // Both presentations share the sections, the sticky
+                            // headers, and the selection wiring; only the shape
+                            // of a clip changes.
+                            if library.presentation == .list {
+                                VStack(spacing: 4) {
+                                    ForEach(group.clips) { clip in
+                                        ClipRow(
+                                            clip: clip,
+                                            density: library.density,
+                                            isSelecting: library.isSelecting,
+                                            isSelected: library.selection.contains(clip.id),
+                                            onToggleSelection: { toggle(clip) }
+                                        ) {
+                                            appState.open(clip)
                                         }
-                                    ) {
-                                        appState.open(clip)
+                                    }
+                                }
+                            } else {
+                                LazyVGrid(
+                                    columns: [
+                                        GridItem(
+                                            .adaptive(minimum: library.density.minimumCardWidth),
+                                            spacing: 16
+                                        )
+                                    ],
+                                    spacing: 16
+                                ) {
+                                    ForEach(group.clips) { clip in
+                                        ClipCard(
+                                            clip: clip,
+                                            density: library.density,
+                                            isSelecting: library.isSelecting,
+                                            isSelected: library.selection.contains(clip.id),
+                                            onToggleSelection: { toggle(clip) }
+                                        ) {
+                                            appState.open(clip)
+                                        }
                                     }
                                 }
                             }
@@ -655,6 +682,11 @@ struct LibraryView: View {
                 }
             }
         }
+    }
+
+    private func toggle(_ clip: Clip) {
+        library.beginSelecting()
+        library.toggleSelection(clip.id)
     }
 
     /// Sticky section header — the gallery runs to hundreds of cards on a real

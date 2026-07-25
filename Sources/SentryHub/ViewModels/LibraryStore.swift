@@ -19,11 +19,25 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 }
 
 enum LibraryPresentation: String, CaseIterable, Identifiable {
-    case grid, map
+    case grid, list, map
+
     var id: String { rawValue }
 
-    var label: String { self == .grid ? "Grid" : "Map" }
-    var symbolName: String { self == .grid ? "square.grid.2x2" : "map" }
+    var label: String {
+        switch self {
+        case .grid: return "Grid"
+        case .list: return "List"
+        case .map: return "Map"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .grid: return "square.grid.2x2"
+        case .list: return "list.bullet"
+        case .map: return "map"
+        }
+    }
 }
 
 /// Card size for the gallery — the three-step density control in the toolbar.
@@ -44,6 +58,16 @@ enum GalleryDensity: String, CaseIterable, Identifiable {
         case .compact: return 220
         case .regular: return 300
         case .large: return 420
+        }
+    }
+
+    /// Poster width in a list row. Shared with the list's column captions so
+    /// the headings stay lined up with what's underneath them.
+    var listThumbnailWidth: CGFloat {
+        switch self {
+        case .compact: return 64
+        case .regular: return 88
+        case .large: return 116
         }
     }
 
