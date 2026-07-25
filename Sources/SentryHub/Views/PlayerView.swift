@@ -365,8 +365,10 @@ struct PlayerView: View {
             Button {
                 model.jumpToEvent()
             } label: {
+                // What the button *does*, not what the clip is — the badge on
+                // the card already names the event kind.
                 Label(
-                    model.clip.trigger?.badgeLabel ?? "EVENT",
+                    "Jump to",
                     systemImage: model.clip.trigger?.symbolName ?? "diamond.fill"
                 )
                 .font(.system(size: 11, weight: .semibold))

@@ -95,7 +95,6 @@ struct TileTrace: View {
 struct CameraTile: View {
     let camera: CameraAngle?
     let player: AVPlayer?
-    let isFocused: Bool
     /// The camera the car says triggered the event — and only while the trace
     /// is warranted and the play head is near the moment it marks.
     let isEventCamera: Bool
@@ -156,13 +155,13 @@ struct CameraTile: View {
                     urgency: eventUrgency
                 )
             } else {
+                // Every tile gets the same hairline. The focused one used to
+                // carry a coloured border, which drew the eye to a tile purely
+                // because it was last clicked — competing with the one highlight
+                // that means something. Which camera is focused is already
+                // legible from the transport bar's camera row.
                 Rectangle()
-                    .strokeBorder(
-                        // A thin tint for the selected tile; the loud highlight
-                        // is reserved for the camera that saw the event.
-                        isFocused ? Color.accentColor.opacity(0.55) : Color.white.opacity(0.06),
-                        lineWidth: isFocused ? 1.5 : 1
-                    )
+                    .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
             }
         }
         .contentShape(Rectangle())
@@ -203,7 +202,6 @@ struct CameraGridView: View {
                     CameraTile(
                         camera: tile.camera,
                         player: tile.camera.flatMap { model.players[$0] },
-                        isFocused: tile.camera == model.focusedCamera && model.layout != .single,
                         isEventCamera: model.showsEventTrace
                             && tile.camera != nil
                             && tile.camera == model.clip.event?.triggerCamera,

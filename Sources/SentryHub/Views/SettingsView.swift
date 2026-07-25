@@ -177,7 +177,7 @@ struct AppearanceSettingsView: View {
 struct PlaybackSettingsView: View {
     @AppStorage("defaultLayout") private var defaultLayout = CameraLayout.six.rawValue
     @AppStorage("galleryDensity") private var galleryDensity = GalleryDensity.regular.rawValue
-    @AppStorage("eventPreRoll") private var eventPreRoll = 20.0
+    @AppStorage("eventPreRoll") private var eventPreRoll = 8.0
     @AppStorage("openingLeadIn") private var openingLeadIn = 60.0
     @AppStorage("galleryGrouping") private var galleryGrouping = ClipGrouping.day.rawValue
 
@@ -223,7 +223,7 @@ struct PlaybackSettingsView: View {
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
-                    Slider(value: $eventPreRoll, in: 0...120, step: 5)
+                    Slider(value: $eventPreRoll, in: 0...120, step: 1)
                 }
             } footer: {
                 Text("Tesla keeps around ten minutes of buffer either side of a Sentry trigger, so the moment you opened the clip for is usually minutes in. Clips with a flagged moment open just before it instead of at 0:00, and the event jump lands with enough run-up to see what led up to it. Clips with no event always open at the start.")
