@@ -32,23 +32,24 @@ and exports a range to MP4 with the HUD burned in.
   remove local copies, or clear clips off the drive. Both destructive actions state exactly what
   they'll destroy first — including the fact that dashcam drives have no Trash, so deleting off one
   is permanent.
-- **Clip library** — the app opens straight into the gallery: clips loaded, GPS-tagged, camera
-  streams, and total storage at a glance. Filter chips for **All / Saved / Sentry** plus
-  an **Event** chip and the trigger chips derived from `event.json`
-  (**Motion / Impact / Honk / Manual Save**, offered only when clips of that kind exist). The folder
-  chip says *where* a clip sits, the event chips say *why* the car kept it, and they don't always
-  agree: tap save during a Sentry event and the clip stays in `SentryClips`. **Event** is the
-  catch-all — it takes everything the car flagged, and it's the only way to reach clips whose
-  `reason` string SentryHub can't name. Cards lead with what happened — **Motion / Impact / Honk /
-  Manual Save** — and a Recent clip carries no badge at all, because nothing happened: it's the car
-  recording as it drives., a date filter with presets and a custom range picker, search,
-  sorting by date/category/length/size/name, three card densities, and a **Grid / List / Map**
-  switch — the grid for recognising footage by sight, the list for scanning hundreds of clips by
-  their facts in aligned columns, the map for pinning every GPS-tagged clip on real tiles. The gallery is sectioned — by day, event kind, or folder —
-  with sticky headers (chosen in Settings → Playback), because a real drive is hundreds of cards. Each card leads with what
-  happened (Motion / Impact / Honk / Manual Save), shows the date, time, town, size, and storage,
-  and can be **renamed** by clicking its title — the label is stored in the app, so the
-  timestamped files on the drive keep the names the car gave them.
+- **Clip library** — the app opens straight into the gallery: clips loaded, what's on this Mac,
+  events, incidents, recency, and total size at a glance. The filter row is a hierarchy, not a flat
+  list: **All**, then **Sentry** with the reasons the car flags by itself (*Motion*, *Impact*), then
+  **Saved** with the ways a driver asks for a clip to be kept (*Honk*, *Manual Save*), and an
+  **Other** chip that appears only when a clip carries a `reason` SentryHub can't name. A folder
+  says *where* a clip sits; a reason says *why* the car kept it, and they don't always agree — tap
+  save during a Sentry event and the clip stays in `SentryClips`.
+
+  Plus a date filter with presets and a custom range picker, search over name, town, street, event,
+  and incident, sorting by date/category/length/size/name, three card densities, and a
+  **Grid / List / Map** switch — the grid for recognising footage by sight, the list for scanning
+  hundreds of clips by their facts in aligned columns, the map for pinning every GPS-tagged clip on
+  real tiles. The gallery is sectioned by day, event kind, or folder with sticky headers (chosen in
+  Settings → Playback), because a real drive is hundreds of cards. Each card leads with what
+  happened — and a Recent clip carries no badge at all, because nothing did: it's the car recording
+  as it drives. Cards show date, time, place, size, and storage, and can be **renamed** by clicking
+  the title — the label is stored in the app, so the timestamped files on the drive keep the names
+  the car gave them.
 - **Synchronised multi-camera playback** — up to six feeds (front, rear, both repeaters, both
   B-pillars) each backed by its own `AVPlayer`, started at a shared host time and drift-corrected
   every two seconds. A Sentry event's ~60-second segments are stitched into one continuous
@@ -178,14 +179,20 @@ next to Sentry and Saved clips, holding one approximate fix:
 
 ```json
 {
-  "timestamp": "2025-12-21T20:59:54",
-  "city": "…",
-  "est_lat": "48.0610",
-  "est_lon": "3.2910",
+  "timestamp": "2026-07-25T14:57:38",
+  "city": "Fair Lawn",
+  "street": "River Rd",
+  "est_lat": "40.93",
+  "est_lon": "-74.1316",
   "reason": "sentry_aware_object_detection",
-  "camera": "0"
+  "camera": "6"
 }
 ```
+
+`street` arrived in newer firmware; `reason` comes in two families, `sentry_aware_*` for what the
+car noticed by itself and `user_interaction_*` for what the driver asked it to keep. Tesla publishes
+none of this and has changed the strings across firmware, so a reason SentryHub doesn't recognise is
+shown as-is and offered under the **Other** chip rather than guessed into the nearest bucket.
 
 SentryHub tries three sources, richest first, and draws `—` for any field none of them supplied —
 it never invents numbers:

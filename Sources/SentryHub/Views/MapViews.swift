@@ -33,7 +33,7 @@ struct LibraryMapView: View {
                 ForEach(clips) { clip in
                     if let coordinate = clip.coordinate {
                         Marker(
-                            clip.city ?? labels.title(for: clip),
+                            clip.placeLabel ?? labels.title(for: clip),
                             systemImage: clip.category.symbolName,
                             coordinate: CLLocationCoordinate2D(
                                 latitude: coordinate.latitude, longitude: coordinate.longitude
@@ -90,8 +90,8 @@ struct LibraryMapView: View {
             Text(clip.startDate.briefFormatted)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if let city = clip.city {
-                Label(city, systemImage: "building.2")
+            if let place = clip.placeLabel {
+                Label(place, systemImage: "building.2")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

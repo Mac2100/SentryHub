@@ -81,19 +81,42 @@ enum ClipTrigger: String, CaseIterable, Identifiable, Codable, Hashable {
         }
     }
 
-    /// Parses the strings Tesla has shipped over the years, e.g.
-    /// `sentry_aware_object_detection`, `sentry_aware_accel_v2`,
-    /// `user_interaction_honk`, `user_interaction_dashcam_icon_tapped`.
+    /// Which system decided to keep the clip, which is also which folder the
+    /// reason comes out of.
+    ///
+    /// Tesla's `reason` strings come in two families, and the prefix is the
+    /// useful part: `sentry_aware_*` is the car noticing something by itself
+    /// while parked, `user_interaction_*` is the driver saying *keep this*.
+    var origin: ClipCategory {
+        switch self {
+        case .motion, .impact: return .sentry
+        case .honk, .manualSave: return .saved
+        }
+    }
+
+    /// Parses the strings Tesla has shipped:
+    ///
+    /// - `sentry_aware_object_detection` — something moved near the parked car
+    /// - `sentry_aware_accel_v2` / `sentry_aware_accel` — the car was jolted
+    /// - `user_interaction_honk` — the horn, while the dashcam was recording
+    /// - `user_interaction_dashcam_icon_tapped`,
+    ///   `user_interaction_dashcam_panel_save` — the driver saved it by hand
+    ///
+    /// Tesla publishes none of this and has changed the strings across
+    /// firmware, so anything unrecognised returns nil and the clip is offered
+    /// under **Other** rather than guessed into the nearest bucket. A blanket
+    /// "starts with sentry, call it Motion" would quietly mislabel whatever
+    /// they ship next.
     init?(reason: String?) {
         guard let raw = reason?.lowercased(), !raw.isEmpty else { return nil }
         if raw.contains("honk") {
             self = .honk
         } else if raw.contains("accel") || raw.contains("impact") || raw.contains("collision") {
             self = .impact
-        } else if raw.hasPrefix("sentry") {
+        } else if raw.contains("object") || raw.contains("detection") || raw.contains("motion") {
             self = .motion
-        } else if raw.hasPrefix("user_interaction") || raw.contains("save")
-                    || raw.contains("tapped") {
+        } else if raw.contains("tapped") || raw.contains("icon") || raw.contains("panel")
+                    || raw.contains("voice") || raw.contains("save") {
             self = .manualSave
         } else {
             return nil
@@ -195,6 +218,8 @@ enum CameraAngle: String, CaseIterable, Identifiable, Codable, Hashable {
 struct EventMetadata: Codable, Hashable {
     var timestamp: Date?
     var city: String?
+    /// The road the car was on. Newer firmware writes this alongside `city`.
+    var street: String?
     var latitude: Double?
     var longitude: Double?
     var reason: String?
@@ -202,7 +227,7 @@ struct EventMetadata: Codable, Hashable {
     var triggerCamera: CameraAngle?
 
     private enum CodingKeys: String, CodingKey {
-        case timestamp, city, reason, camera
+        case timestamp, city, street, reason, camera
         case estLat = "est_lat"
         case estLon = "est_lon"
     }
@@ -210,6 +235,7 @@ struct EventMetadata: Codable, Hashable {
     init(
         timestamp: Date? = nil,
         city: String? = nil,
+        street: String? = nil,
         latitude: Double? = nil,
         longitude: Double? = nil,
         reason: String? = nil,
@@ -217,6 +243,7 @@ struct EventMetadata: Codable, Hashable {
     ) {
         self.timestamp = timestamp
         self.city = city
+        self.street = street
         self.latitude = latitude
         self.longitude = longitude
         self.reason = reason
@@ -229,6 +256,7 @@ struct EventMetadata: Codable, Hashable {
             timestamp = TeslaTimestamp.parse(raw)
         }
         city = try? container.decodeIfPresent(String.self, forKey: .city)
+        street = try? container.decodeIfPresent(String.self, forKey: .street)
         latitude = EventMetadata.decodeNumber(container, .estLat)
         longitude = EventMetadata.decodeNumber(container, .estLon)
         reason = try? container.decodeIfPresent(String.self, forKey: .reason)
@@ -249,6 +277,7 @@ struct EventMetadata: Codable, Hashable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(timestamp.map(TeslaTimestamp.string(from:)), forKey: .timestamp)
         try container.encodeIfPresent(city, forKey: .city)
+        try container.encodeIfPresent(street, forKey: .street)
         try container.encodeIfPresent(latitude.map { String($0) }, forKey: .estLat)
         try container.encodeIfPresent(longitude.map { String($0) }, forKey: .estLon)
         try container.encodeIfPresent(reason, forKey: .reason)
@@ -425,6 +454,12 @@ struct Clip: Identifiable, Hashable {
         trigger != nil || event?.reasonLabel != nil
     }
 
+    /// The car gave a reason for keeping this clip that SentryHub can't name.
+    /// These are the only clips no trigger chip can reach.
+    var hasUnclassifiedEvent: Bool {
+        trigger == nil && event?.reasonLabel != nil
+    }
+
     /// Where the playable timeline actually begins.
     ///
     /// A Sentry folder is *named* for the moment of the event, but the footage
@@ -463,6 +498,24 @@ struct Clip: Identifiable, Hashable {
     var city: String? {
         guard let city = event?.city, !city.isEmpty else { return nil }
         return city
+    }
+
+    var street: String? {
+        guard let street = event?.street, !street.isEmpty else { return nil }
+        return street
+    }
+
+    /// "River Rd, Fair Lawn" — the most specific place the car named.
+    ///
+    /// `street` arrived in newer firmware and the app never read it, so a clip
+    /// that knew its road was only ever showing its town.
+    var placeLabel: String? {
+        switch (street, city) {
+        case let (street?, city?): return "\(street), \(city)"
+        case let (street?, nil): return street
+        case let (nil, city?): return city
+        default: return nil
+        }
     }
 
     /// Every file in the clip, ordered by segment then camera.

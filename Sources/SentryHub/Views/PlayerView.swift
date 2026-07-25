@@ -117,8 +117,8 @@ struct PlayerView: View {
                     headerFact(symbol: "clock", text: clip.startDate.briefFormatted)
                     headerFact(symbol: "video", text: "\(model.availableCameras.count)")
                     headerFact(symbol: "timer", text: Format.duration(model.duration))
-                    if let city = clip.city {
-                        headerFact(symbol: "building.2", text: city)
+                    if let place = clip.placeLabel {
+                        headerFact(symbol: "building.2", text: place)
                     }
                     if !model.telemetry.isEmpty {
                         headerFact(

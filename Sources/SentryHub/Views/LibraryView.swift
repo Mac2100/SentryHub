@@ -297,17 +297,28 @@ struct LibraryView: View {
     private var controls: some View {
         VStack(spacing: 14) {
             HStack(spacing: 10) {
-                // Everything, then the folders you or the car chose to keep.
                 ForEach(library.leadingChips) { chip in
                     filterChip(chip)
                 }
 
+                // Each folder leads the reasons that only occur inside it, so
+                // the row reads as a hierarchy rather than as one flat list of
+                // categories that happen to overlap.
                 Divider().frame(height: 22)
-
-                // Sentry sits on this side with the reasons it fired, because
-                // that's the folder those clips come from.
-                ForEach(library.eventChips) { chip in
+                ForEach(library.sentryChips) { chip in
                     filterChip(chip)
+                }
+
+                Divider().frame(height: 22)
+                ForEach(library.savedChips) { chip in
+                    filterChip(chip)
+                }
+
+                if !library.otherChips.isEmpty {
+                    Divider().frame(height: 22)
+                    ForEach(library.otherChips) { chip in
+                        filterChip(chip)
+                    }
                 }
 
                 Spacer()
