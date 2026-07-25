@@ -24,7 +24,28 @@ struct HUDCanvas: View {
     let city: String?
     let route: [CLLocationCoordinate2D]
     let progress: Double
+    /// What this clip can actually feed. Elements with no data are hidden when
+    /// `config.autoHideUnavailable` is on, rather than drawn as em dashes.
+    var availability: TelemetryAvailability = TelemetryAvailability()
     var context: Context = .live
+
+    /// An element draws when it's switched on and either has data or auto-hide
+    /// is off.
+    private func shows(_ isOn: Bool, _ elementID: String) -> Bool {
+        guard isOn else { return false }
+        guard config.autoHideUnavailable else { return true }
+        return availability.supports(elementID: elementID)
+    }
+
+    private var showsSpeedometer: Bool { shows(config.speedometer, "speedometer") }
+    private var showsPedals: Bool { shows(config.pedals, "pedals") }
+    private var showsSteering: Bool { shows(config.steeringWheel, "steeringWheel") }
+    private var showsGear: Bool { shows(config.gearSelector, "gearSelector") }
+    private var showsAutopilot: Bool { shows(config.autopilot, "autopilot") }
+    private var showsGForce: Bool { shows(config.gForceIndicator, "gForce") }
+    private var showsLocation: Bool { shows(config.location, "location") }
+    private var showsTurnSignals: Bool { shows(config.turnSignals, "turnSignals") }
+    private var showsCompass: Bool { shows(config.compassCoords, "compass") }
 
     /// Everything scales off a 1600×900 reference so the HUD looks the same at
     /// any window size or export resolution.
@@ -74,7 +95,7 @@ struct HUDCanvas: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                     .padding(inset)
-                    .padding(.bottom, config.compassCoords || config.location ? 40 * unit : 0)
+                    .padding(.bottom, showsCompass || showsLocation ? 40 * unit : 0)
             }
         }
         .frame(width: size.width, height: size.height)
@@ -87,26 +108,26 @@ struct HUDCanvas: View {
     @ViewBuilder
     private var leftCluster: some View {
         VStack(alignment: .leading, spacing: 14 * unit) {
-            if config.gearSelector || config.autopilot {
+            if showsGear || showsAutopilot {
                 HStack(spacing: 10 * unit) {
-                    if config.gearSelector { gearSelector }
-                    if config.autopilot { autopilotPill }
+                    if showsGear { gearSelector }
+                    if showsAutopilot { autopilotPill }
                 }
             }
 
-            if config.speedometer || config.pedals || config.gForceIndicator {
+            if showsSpeedometer || showsPedals || showsGForce {
                 HStack(alignment: .top, spacing: 20 * unit) {
-                    if config.pedals || config.gForceIndicator {
+                    if showsPedals || showsGForce {
                         VStack(spacing: 10 * unit) {
-                            if config.pedals { pedalMeter }
-                            if config.gForceIndicator { gForceCluster }
+                            if showsPedals { pedalMeter }
+                            if showsGForce { gForceCluster }
                         }
                     }
-                    if config.speedometer { speedReadout }
+                    if showsSpeedometer { speedReadout }
                 }
             }
 
-            if config.location, let city {
+            if showsLocation, let city {
                 Label(city, systemImage: "mappin.and.ellipse")
                     .font(.system(size: 13 * unit, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
@@ -260,12 +281,12 @@ struct HUDCanvas: View {
 
     @ViewBuilder
     private var topCentre: some View {
-        if config.steeringWheel || config.turnSignals {
+        if showsSteering || showsTurnSignals {
             HStack(spacing: 16 * unit) {
-                if config.turnSignals {
+                if showsTurnSignals {
                     signalArrow(systemName: "arrow.left", lit: sample?.turnSignalLeft == true)
                 }
-                if config.steeringWheel {
+                if showsSteering {
                     ZStack {
                         Circle()
                             .fill(Color.black.opacity(0.42))
@@ -279,7 +300,7 @@ struct HUDCanvas: View {
                             .rotationEffect(.degrees(sample?.steeringAngle ?? 0))
                     }
                 }
-                if config.turnSignals {
+                if showsTurnSignals {
                     signalArrow(systemName: "arrow.right", lit: sample?.turnSignalRight == true)
                 }
             }
@@ -347,7 +368,7 @@ struct HUDCanvas: View {
 
     @ViewBuilder
     private var bottomLeftReadouts: some View {
-        if config.compassCoords {
+        if showsCompass {
             HStack(spacing: 10 * unit) {
                 if let heading = sample?.heading {
                     HStack(spacing: 4 * unit) {

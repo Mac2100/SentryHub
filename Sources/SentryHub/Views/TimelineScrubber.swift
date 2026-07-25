@@ -10,6 +10,8 @@ struct TimelineScrubber: View {
     let trimEnd: TimeInterval
     /// Boundaries between the clip's ~60 s segments, in seconds.
     let segmentMarks: [TimeInterval]
+    /// Where the triggering event happened, if it falls inside the footage.
+    var eventMark: TimeInterval?
     let tint: Color
     let onScrub: (TimeInterval) -> Void
     let onScrubEnded: () -> Void
@@ -53,6 +55,15 @@ struct TimelineScrubber: View {
                 if hasTrim {
                     trimHandle.offset(x: width * fraction(trimStart) - 1)
                     trimHandle.offset(x: width * fraction(trimEnd) - 1)
+                }
+
+                if let eventMark {
+                    Image(systemName: "diamond.fill")
+                        .font(.system(size: 8))
+                        .foregroundStyle(Color(red: 1.0, green: 0.42, blue: 0.30))
+                        .shadow(color: .black.opacity(0.5), radius: 2)
+                        .offset(x: width * fraction(eventMark) - 4)
+                        .help("Event")
                 }
 
                 Circle()

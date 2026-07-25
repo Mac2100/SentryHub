@@ -54,6 +54,33 @@ enum GalleryDensity: String, CaseIterable, Identifiable {
     }
 }
 
+/// Presets for the library's date filter.
+enum DateRangePreset: String, CaseIterable, Identifiable {
+    case any, today, week, month, custom
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .any: return "Any date"
+        case .today: return "Today"
+        case .week: return "Last 7 days"
+        case .month: return "Last 30 days"
+        case .custom: return "Custom range"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .any: return "calendar"
+        case .today: return "calendar.badge.clock"
+        case .week: return "calendar.day.timeline.left"
+        case .month: return "calendar.badge.plus"
+        case .custom: return "calendar.badge.exclamationmark"
+        }
+    }
+}
+
 /// Owns the scanned clip library plus the gallery's filter/sort state.
 @MainActor
 final class LibraryStore: ObservableObject {
@@ -62,17 +89,21 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var resolvedRoot: URL?
     @Published private(set) var isScanning = false
     @Published private(set) var scanError: String?
-    @Published private(set) var isUsingSampleLibrary = false
-    @Published private(set) var isBuildingSample = false
-    /// 0…1 while the sample library is being generated.
-    @Published private(set) var sampleProgress: Double = 0
 
     // Filters
     @Published var categoryFilter: ClipCategory?
+    @Published var triggerFilter: ClipTrigger?
     @Published var searchText: String = ""
     @Published var sortOrder: LibrarySortOrder = .date
     @Published var presentation: LibraryPresentation = .grid
     @Published var density: GalleryDensity = .regular
+
+    // Date filter
+    @Published var datePreset: DateRangePreset = .any
+    @Published var customStart: Date = Calendar.current.date(
+        byAdding: .day, value: -7, to: Date()
+    ) ?? Date()
+    @Published var customEnd: Date = Date()
 
     private var durationTask: Task<Void, Never>?
 
@@ -87,17 +118,16 @@ final class LibraryStore: ObservableObject {
 
     func restoreLastFolder() async {
         guard let url = FolderAccess.restore() else { return }
-        await load(root: url, isSample: url.path.hasPrefix(SampleLibrary.rootURL.path))
+        await load(root: url)
     }
 
     func chooseFolder() async {
         guard let url = FolderAccess.chooseFolder(startingAt: rootURL) else { return }
-        await load(root: url, isSample: false)
+        await load(root: url)
     }
 
-    func load(root: URL, isSample: Bool) async {
+    func load(root: URL) async {
         rootURL = root
-        isUsingSampleLibrary = isSample
         await rescan()
     }
 
@@ -157,42 +187,12 @@ final class LibraryStore: ObservableObject {
         }
     }
 
-    // MARK: - Sample library
-
-    func loadSampleLibrary(force: Bool = false) async {
-        isBuildingSample = true
-        sampleProgress = 0
-        defer {
-            isBuildingSample = false
-            sampleProgress = 0
-        }
-        do {
-            let root = try await SampleLibrary.build(force: force) { [weak self] fraction in
-                self?.sampleProgress = fraction
-            }
-            FolderAccess.remember(root)
-            await load(root: root, isSample: true)
-            ToastCenter.shared.show(
-                "Sample library loaded",
-                detail: "\(clips.count) synthetic clips with demo telemetry"
-            )
-        } catch {
-            scanError = error.localizedDescription
-            ToastCenter.shared.show(
-                "Couldn't build the sample library",
-                detail: error.localizedDescription,
-                style: .error
-            )
-        }
-    }
-
     func forgetFolder() {
         FolderAccess.forget()
         rootURL = nil
         resolvedRoot = nil
         clips = []
         scanError = nil
-        isUsingSampleLibrary = false
     }
 
     // MARK: - Derived state
@@ -204,6 +204,53 @@ final class LibraryStore: ObservableObject {
         }
         return result
     }
+
+    /// Trigger kinds actually present, so no empty pills are offered.
+    var availableTriggers: [ClipTrigger] {
+        let present = Set(clips.compactMap(\.trigger))
+        return ClipTrigger.allCases.filter { present.contains($0) }
+    }
+
+    func triggerCount(_ trigger: ClipTrigger) -> Int {
+        clips.filter { $0.trigger == trigger }.count
+    }
+
+    /// The window the date filter currently allows, or `nil` for "any date".
+    var dateInterval: DateInterval? {
+        let calendar = Calendar.current
+        let now = Date()
+        switch datePreset {
+        case .any:
+            return nil
+        case .today:
+            let start = calendar.startOfDay(for: now)
+            return DateInterval(start: start, end: now)
+        case .week:
+            let start = calendar.date(byAdding: .day, value: -7, to: calendar.startOfDay(for: now))
+            return DateInterval(start: start ?? now, end: now)
+        case .month:
+            let start = calendar.date(byAdding: .day, value: -30, to: calendar.startOfDay(for: now))
+            return DateInterval(start: start ?? now, end: now)
+        case .custom:
+            let start = calendar.startOfDay(for: min(customStart, customEnd))
+            let end = calendar.date(
+                byAdding: .day, value: 1, to: calendar.startOfDay(for: max(customStart, customEnd))
+            ) ?? max(customStart, customEnd)
+            return DateInterval(start: start, end: end)
+        }
+    }
+
+    /// Label for the date-filter button.
+    var dateFilterLabel: String {
+        guard datePreset == .custom else { return datePreset.label }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        let a = min(customStart, customEnd)
+        let b = max(customStart, customEnd)
+        return "\(formatter.string(from: a)) – \(formatter.string(from: b))"
+    }
+
+    var isDateFiltered: Bool { datePreset != .any }
 
     var gpsTaggedCount: Int {
         clips.filter { $0.coordinate != nil }.count
@@ -228,6 +275,14 @@ final class LibraryStore: ObservableObject {
 
         if let categoryFilter {
             result = result.filter { $0.category == categoryFilter }
+        }
+
+        if let triggerFilter {
+            result = result.filter { $0.trigger == triggerFilter }
+        }
+
+        if let interval = dateInterval {
+            result = result.filter { interval.contains($0.startDate) }
         }
 
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -262,6 +317,18 @@ final class LibraryStore: ObservableObject {
     /// Clips that can be pinned on the library map.
     var mappableClips: [Clip] {
         filteredClips.filter { $0.coordinate != nil }
+    }
+
+    func clearFilters() {
+        categoryFilter = nil
+        triggerFilter = nil
+        searchText = ""
+        datePreset = .any
+    }
+
+    var hasActiveFilters: Bool {
+        categoryFilter != nil || triggerFilter != nil || isDateFiltered
+            || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     func persistDensity() {

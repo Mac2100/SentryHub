@@ -175,6 +175,7 @@ struct PlayerView: View {
                     trimStart: model.trimStart,
                     trimEnd: model.trimEnd,
                     segmentMarks: segmentMarks,
+                    eventMark: model.eventOffset,
                     tint: theme.primary,
                     onScrub: { time in
                         if model.isPlaying {
@@ -205,6 +206,7 @@ struct PlayerView: View {
                 layoutPicker
                 Divider().frame(height: 20).overlay(Color.white.opacity(0.12))
                 trimControls
+                eventJumpButton
                 Spacer(minLength: 12)
                 mapButton
                 hudButton
@@ -345,6 +347,28 @@ struct PlayerView: View {
         }
     }
 
+    /// Jumps to the moment the car flagged — the Sentry trigger, horn press, or
+    /// manual save recorded in `event.json`.
+    @ViewBuilder
+    private var eventJumpButton: some View {
+        if let offset = model.eventOffset {
+            Button {
+                model.jumpToEvent()
+            } label: {
+                Label(
+                    model.clip.trigger?.badgeLabel ?? "EVENT",
+                    systemImage: model.clip.trigger?.symbolName ?? "diamond.fill"
+                )
+                .font(.system(size: 11, weight: .semibold))
+            }
+            .buttonStyle(TransportButtonStyle(
+                tint: Color(red: 1.0, green: 0.42, blue: 0.30),
+                isActive: abs(model.currentTime - offset) < 0.4
+            ))
+            .help("Jump to the event at \(Format.timecode(offset))")
+        }
+    }
+
     private var trimControls: some View {
         HStack(spacing: 6) {
             Button("IN") { model.markIn() }
@@ -427,7 +451,7 @@ struct PlayerView: View {
             tint: theme.primary, isActive: hudStore.config.enabled
         ))
         .popover(isPresented: $showHUDPanel, arrowEdge: .top) {
-            HUDSettingsPanel(config: $hudStore.config)
+            HUDSettingsPanel(config: $hudStore.config, availability: model.availability)
         }
         .contextMenu {
             Toggle("Show HUD", isOn: $hudStore.config.enabled)
@@ -458,6 +482,8 @@ struct PlayerView: View {
                 .keyboardShortcut("c", modifiers: [])
             Button("") { model.isFullScreen.toggle() }
                 .keyboardShortcut("f", modifiers: [])
+            Button("") { model.jumpToEvent() }
+                .keyboardShortcut("e", modifiers: [])
             Button("") { onClose() }
                 .keyboardShortcut(.escape, modifiers: [])
         }

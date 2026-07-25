@@ -50,9 +50,10 @@ struct SentryHubApp: App {
 
                 Divider()
 
-                Button("Load Sample Library") {
-                    Task { await appState.library.loadSampleLibrary() }
+                Button("Back to Start Screen") {
+                    appState.showStartScreen()
                 }
+                .disabled(appState.library.rootURL == nil)
             }
         }
 

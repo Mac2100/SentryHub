@@ -14,9 +14,11 @@ MP4 with the HUD burned in.
 ## Features
 
 - **Clip library** — the app opens straight into the gallery: clips loaded, GPS-tagged, camera
-  streams, and total storage at a glance, with filter chips for **All / Sentry / Saved / Recent**,
-  search by date, city, coordinates or event reason, sorting by date/length/size/name, three card
-  densities, and a **Grid / Map** switch that pins every GPS-tagged clip on a real map.
+  streams, and total storage at a glance. Filter chips for **All / Sentry / Saved / Recent** plus
+  trigger chips derived from `event.json` (**Motion / Impact / Honk / Saved by You**, offered only
+  when clips of that kind exist), a date filter with presets and a custom range picker, search,
+  sorting by date/length/size/name, three card densities, and a **Grid / Map** switch that pins
+  every GPS-tagged clip on a real map.
 - **Synchronised multi-camera playback** — up to six feeds (front, rear, both repeaters, both
   B-pillars) each backed by its own `AVPlayer`, started at a shared host time and drift-corrected
   every two seconds. A Sentry event's ~60-second segments are stitched into one continuous
@@ -26,7 +28,7 @@ MP4 with the HUD burned in.
   focused camera; angles the vehicle never recorded stay as labelled placeholders.
 - **Customisable HUD** — speedometer, pedals, steering wheel, gear selector, Autopilot/FSD state,
   g-force indicator, date, time, location, turn signals, and compass & coordinates, each toggled
-  individually. Choose KM/H, MPH and M/S (any combination), 0–2 speed decimals, an AUTO/US/EU/ISO
+  individually. Readouts a clip has no data for are hidden by default rather than drawn as `—`. Choose KM/H, MPH and M/S (any combination), 0–2 speed decimals, an AUTO/US/EU/ISO
   date format, and interface opacity and size.
 - **Maps** — a vector mini map baked into the HUD, with a **Map Settings** popover for Visible,
   Theme (Dark / Light / Satellite), Rotation (Heading / North Up), Zoom level, Size (S / M / L), and
@@ -36,8 +38,8 @@ MP4 with the HUD burned in.
 - **Trim & export** — set IN and OUT points on the timeline, then export the current grid to MP4.
   The HUD is rendered by the *same* SwiftUI view the player uses, so exports are WYSIWYG. Also
   exports the current frame as a PNG.
-- **Sample library** — one click generates synthetic clips with demo telemetry so the player, HUD,
-  map, and exporter can be tried without a dashcam drive.
+- **Event marker** — the moment the car flagged (Sentry trigger, horn, manual save) is marked on the
+  timeline and reachable with one click, or the `E` key.
 - **Themes & appearance** — six accent themes and a System/Light/Dark override.
 - **One-click updates** — an optional launch check against GitHub Releases; installing downloads
   the DMG, swaps the app in place, and relaunches.
@@ -94,6 +96,7 @@ The chosen folder is remembered between launches. Click any card to open the pla
 | `[` `]` | Set the trim in / out point |
 | `C` | Cycle the focused camera |
 | `F` | Maximise the picture |
+| `E` | Jump to the event marker |
 | `Esc` | Back to the library |
 | `⌘O` | Choose the TeslaCam folder |
 | `⌘R` | Rescan |
@@ -168,12 +171,17 @@ A bare JSON array of the same rows works too, as does a CSV whose header uses th
 ## Export
 
 **Export** on the transport bar opens the sheet: pick the range (the trim range or the whole clip),
-the layout, a quality preset, and whether the HUD is burned in.
+the layout, **Resolution** (720p/1080p), **Frame Rate** (30/60), **Quality** (4/8 Mbps), **Format**
+(H.264/HEVC), and whether the HUD is burned in.
 
-The HUD is rasterised from the same `HUDCanvas` view the player draws, at the export resolution,
-and attached as a Core Animation overlay. HUD refresh defaults to 5 Hz because telemetry itself
-samples at 1–4 Hz; raising it costs render time without adding information. Frames are held
-PNG-compressed in memory so a long export doesn't balloon.
+An `AVAssetReaderVideoCompositionOutput` composes the camera grid, the HUD is drawn onto each
+decoded frame, and an `AVAssetWriter` encodes at the chosen resolution, frame rate, and bitrate —
+so the result doesn't depend on playback keeping up or on the window staying in front.
+
+The HUD is rasterised from the same `HUDCanvas` view the player draws, at the export resolution.
+Refresh defaults to 5 Hz because telemetry itself samples at 1–4 Hz; raising it costs render time
+without adding information. Frames are held PNG-compressed in memory so a long export doesn't
+balloon.
 
 ## CI / Releases
 
