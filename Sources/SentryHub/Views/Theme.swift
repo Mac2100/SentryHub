@@ -254,7 +254,7 @@ struct CapsuleSegments<T: Hashable>: View {
 }
 
 /// Filter chip with a trailing count badge, as used by the library's
-/// All / Sentry / Saved / Recent row.
+/// All / Saved / Sentry row.
 struct CountChip: View {
     let label: String
     let symbol: String

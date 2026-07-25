@@ -50,12 +50,15 @@ enum ClipTrigger: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var id: String { rawValue }
 
+    /// Deliberately not "Saved": that word belongs to Tesla's `SavedClips`
+    /// folder, and a clip can be manually saved without landing in it — tap
+    /// save during a Sentry event and it stays in `SentryClips`.
     var label: String {
         switch self {
         case .motion: return "Motion"
         case .impact: return "Impact"
         case .honk: return "Honk"
-        case .manualSave: return "Saved by You"
+        case .manualSave: return "Manual Save"
         }
     }
 
@@ -65,7 +68,7 @@ enum ClipTrigger: String, CaseIterable, Identifiable, Codable, Hashable {
         case .motion: return "MOTION"
         case .impact: return "IMPACT"
         case .honk: return "HONK"
-        case .manualSave: return "MANUAL"
+        case .manualSave: return "MANUAL SAVE"
         }
     }
 
@@ -332,11 +335,14 @@ enum ClipStorage: String, CaseIterable, Identifiable, Codable, Hashable {
     }
 
     /// Chip text on a clip card.
+    ///
+    /// Both local states read the same, and neither says "Saved": that word is
+    /// already taken twice over by Tesla's `SavedClips` folder and by a manual
+    /// save, and three meanings for one word on one card is two too many.
     var shortLabel: String {
         switch self {
         case .device: return "Drive only"
-        case .local: return "On this Mac"
-        case .both: return "Saved"
+        case .local, .both: return "On this Mac"
         }
     }
 
