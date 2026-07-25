@@ -177,13 +177,15 @@ PNG-compressed in memory so a long export doesn't balloon.
 
 ## CI / Releases
 
-Every push and pull request builds the app and uploads a DMG artifact via GitHub Actions. Pushing a
-tag like `v1.2.0` additionally creates a GitHub Release with the DMG attached — which is what the
-in-app update checker looks at.
+Every push and pull request builds the app and uploads a DMG artifact via GitHub Actions.
 
-To cut a release: bump `AppVersion.marketing` in `Sources/SentryHub/Support/AppVersion.swift`, then
-tag the commit `v<version>` and push the tag. The **Build** workflow can also be dispatched manually
-with *release* checked.
+**Releases publish themselves.** When a pull request lands on `main`, the workflow tags the merge
+commit `v<AppVersion.marketing>` and creates a GitHub Release with the DMG attached — which is what
+the in-app update checker looks at. It skips publishing when that tag already exists, so bumping
+`AppVersion.marketing` in `Sources/SentryHub/Support/AppVersion.swift` is what decides a new version
+ships; merging docs or fixes without a bump just refreshes the build artifact.
+
+Pushing a `v*` tag by hand, or dispatching **Build** manually with *release* checked, publishes too.
 
 ## Privacy
 

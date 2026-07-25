@@ -46,12 +46,31 @@ jobs:
           path: dist/*.dmg
           if-no-files-found: error
 
+      # Landing on main publishes a release automatically, but only for a version
+      # that hasn't shipped yet — so bumping AppVersion.marketing is what decides
+      # a new release goes out, and repeat merges can't clobber a shipped one.
+      - name: Decide whether main should publish
+        id: gate
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${tag} is already released — bump AppVersion.marketing to ship a new version."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Publishing ${tag}."
+          fi
+
       - name: Create release
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release)
+        if: >-
+          startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && inputs.release)
+          || steps.gate.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.dmg
           generate_release_notes: true
-          # On tag pushes, release under that tag; on manual dispatch, create
-          # the tag v<app version> at the built commit.
+          # On tag pushes, release under that tag; otherwise create the tag
+          # v<app version> at the built commit.
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.version.outputs.version) }}
