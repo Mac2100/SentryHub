@@ -65,6 +65,10 @@ struct PlayerView: View {
         .background(playerBackdrop)
         .task {
             await model.load()
+            await model.refreshMapBackdrop(config: hudStore.config)
+        }
+        .task(id: mapBackdropKey) {
+            await model.refreshMapBackdrop(config: hudStore.config)
         }
         .onDisappear {
             model.teardown()
@@ -73,6 +77,11 @@ struct PlayerView: View {
             ExportSheet(model: model, config: hudStore.config)
         }
         .background(shortcuts)
+    }
+
+    /// Only re-snapshot the map when something that changes the tiles changes.
+    private var mapBackdropKey: String {
+        "\(hudStore.config.mapEnabled)-\(hudStore.config.mapTheme.rawValue)-\(Int(hudStore.config.mapZoomLevel))-\(model.telemetry.samples.count)"
     }
 
     private var playerBackdrop: some View {
@@ -365,7 +374,7 @@ struct PlayerView: View {
                 tint: Color(red: 1.0, green: 0.42, blue: 0.30),
                 isActive: abs(model.currentTime - offset) < 0.4
             ))
-            .help("Jump to the event at \(Format.timecode(offset))")
+            .help("Jump to \(Int(PlayerModel.eventPreRoll)) s before the event at \(Format.timecode(offset))")
         }
     }
 

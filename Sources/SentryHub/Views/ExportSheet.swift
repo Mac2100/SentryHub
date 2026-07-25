@@ -396,6 +396,7 @@ struct ExportSheet: View {
             telemetry: model.telemetry,
             config: config,
             availability: model.availability,
+            mapBackdrop: model.mapBackdrop,
             options: options,
             range: range,
             to: destination
@@ -413,6 +414,7 @@ struct ExportSheet: View {
                 telemetry: model.telemetry,
                 config: config,
                 availability: model.availability,
+                mapBackdrop: model.mapBackdrop,
                 layout: exportLayout,
                 focused: model.focusedCamera,
                 time: model.currentTime,

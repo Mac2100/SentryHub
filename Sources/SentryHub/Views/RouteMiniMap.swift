@@ -13,6 +13,9 @@ struct RouteMiniMap: View {
     let heading: Double?
     let progress: Double
     let config: HUDConfiguration
+    /// Real map tiles under the route. Without one the card is vector-only,
+    /// which reads as empty for a clip whose only fix is from `event.json`.
+    var backdrop: MapBackdrop?
     /// Scales every stroke and radius with the HUD.
     var unit: CGFloat = 1
 
@@ -64,8 +67,17 @@ struct RouteMiniMap: View {
                 RoundedRectangle(cornerRadius: 9 * unit, style: .continuous)
                     .fill(colors.background)
 
-                // Faint graticule so an empty card still reads as a map.
-                Path { path in
+                if let backdrop {
+                    Image(decorative: backdrop.image, scale: 1)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: box.width, height: box.height)
+                        .clipped()
+                }
+
+                // Faint graticule, only when there are no tiles to sit on.
+                if backdrop == nil {
+                    Path { path in
                     let steps = 4
                     for index in 1..<steps {
                         let x = box.width * CGFloat(index) / CGFloat(steps)
@@ -75,8 +87,9 @@ struct RouteMiniMap: View {
                         path.move(to: CGPoint(x: 0, y: y))
                         path.addLine(to: CGPoint(x: box.width, y: y))
                     }
+                    }
+                    .stroke(colors.grid, lineWidth: 0.75 * unit)
                 }
-                .stroke(colors.grid, lineWidth: 0.75 * unit)
 
                 if points.count > 1, config.mapTrackStyle != .hidden {
                     if config.mapTrackStyle == .full {
@@ -103,7 +116,7 @@ struct RouteMiniMap: View {
                         .position(points[points.count - 1])
                 }
 
-                if let marker = currentPoint(points) {
+                if points.count > 1, let marker = currentPoint(points) {
                     ZStack {
                         Circle()
                             .fill(Color(red: 0.20, green: 0.55, blue: 1.0))
@@ -124,6 +137,13 @@ struct RouteMiniMap: View {
                         .font(.system(size: 8 * unit, weight: .semibold))
                         .tracking(1)
                         .foregroundStyle(colors.ink.opacity(0.45))
+                } else if points.count == 1 {
+                    // A single event.json fix: a pin says more than a bare dot.
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 16 * unit))
+                        .foregroundStyle(Color(red: 1.0, green: 0.35, blue: 0.30))
+                        .shadow(color: .black.opacity(0.5), radius: 2 * unit)
+                        .position(points[0])
                 }
 
                 if config.mapShowLabel {
@@ -187,6 +207,15 @@ struct RouteMiniMap: View {
         let inset = 10 * unit
         let usable = min(box.width, box.height) - inset * 2
         guard usable > 0 else { return [] }
+
+        // With tiles underneath, the overlay must use the snapshot's own region
+        // or the route would float away from the roads it's drawn on.
+        if let backdrop {
+            return route.map { coordinate in
+                let unitPoint = backdrop.unitPoint(for: coordinate)
+                return CGPoint(x: unitPoint.x * box.width, y: unitPoint.y * box.height)
+            }
+        }
 
         let center = config.mapRouteOverview
             ? RouteMiniMap.centroid(of: route)

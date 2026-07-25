@@ -33,13 +33,17 @@ MP4 with the HUD burned in.
 - **Maps** — a vector mini map baked into the HUD, with a **Map Settings** popover for Visible,
   Theme (Dark / Light / Satellite), Rotation (Heading / North Up), Zoom level, Size (S / M / L), and
   Route Overview; corner, route line, endpoint markers, label, export inclusion, and opacity live in
-  Settings → HUD. Behind the same button sits a tile-backed interactive route map whose camera
-  follows the play head — or frames the whole drive when Route Overview is on.
+  Settings → HUD. Real map tiles are snapshotted once per clip and sit under the route, so a clip
+  whose only fix is the one in `event.json` still shows where it happened. Behind the same button
+  sits a fully interactive route map whose camera follows the play head — or frames the whole drive
+  when Route Overview is on.
 - **Trim & export** — set IN and OUT points on the timeline, then export the current grid to MP4.
   The HUD is rendered by the *same* SwiftUI view the player uses, so exports are WYSIWYG. Also
   exports the current frame as a PNG.
-- **Event marker** — the moment the car flagged (Sentry trigger, horn, manual save) is marked on the
-  timeline and reachable with one click, or the `E` key.
+- **Event focus** — the moment the car flagged (Sentry trigger, horn, manual save) is marked on the
+  timeline and reachable with one click or the `E` key, landing five seconds early so the lead-in is
+  visible. The camera that saw it is traced with a pulsing highlight that quickens as the play head
+  closes in, and the HUD flashes what happened as it passes.
 - **Themes & appearance** — six accent themes and a System/Light/Dark override.
 - **One-click updates** — an optional launch check against GitHub Releases; installing downloads
   the DMG, swaps the app in place, and relaunches.
@@ -96,7 +100,7 @@ The chosen folder is remembered between launches. Click any card to open the pla
 | `[` `]` | Set the trim in / out point |
 | `C` | Cycle the focused camera |
 | `F` | Maximise the picture |
-| `E` | Jump to the event marker |
+| `E` | Jump to five seconds before the event |
 | `Esc` | Back to the library |
 | `⌘O` | Choose the TeslaCam folder |
 | `⌘R` | Rescan |

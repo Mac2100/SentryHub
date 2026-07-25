@@ -2,6 +2,7 @@ import AVFoundation
 import Combine
 import CoreMedia
 import Foundation
+import MapKit
 import SwiftUI
 
 /// Tile arrangements offered by the transport bar.
@@ -67,6 +68,8 @@ final class PlayerModel: ObservableObject {
     @Published private(set) var telemetry: TelemetryTrack = .empty
     /// Which HUD readouts this clip can actually feed.
     @Published private(set) var availability: TelemetryAvailability = .clockOnly
+    /// Real map tiles behind the HUD's mini map, snapshotted once per clip.
+    @Published private(set) var mapBackdrop: MapBackdrop?
 
     static let rateOptions: [Double] = [0.25, 0.5, 1, 1.5, 2, 4]
 
@@ -151,7 +154,9 @@ final class PlayerModel: ObservableObject {
 
         let loaded = await TelemetryLoader.load(for: clip)
         telemetry = loaded
-        availability = TelemetryAvailability(track: loaded, hasCity: clip.city != nil)
+        availability = TelemetryAvailability(
+            track: loaded, hasCity: clip.city != nil, hasEvent: clip.eventOffset != nil
+        )
     }
 
     /// Stitches one camera's segments into a single continuous track.
@@ -374,9 +379,49 @@ final class PlayerModel: ObservableObject {
     /// recorded footage.
     var eventOffset: TimeInterval? { clip.eventOffset }
 
+    /// Seconds of run-up given when jumping to the event, so the lead-in is
+    /// visible rather than starting at the moment itself.
+    static let eventPreRoll: TimeInterval = 5
+
     func jumpToEvent() {
         guard let eventOffset else { return }
-        seek(to: eventOffset)
+        seek(to: max(0, eventOffset - Self.eventPreRoll))
+    }
+
+    /// True while the play head is inside the window the event flash covers.
+    var isNearEvent: Bool { eventUrgency > 0 }
+
+    /// 0…1, rising as the play head closes on the event. Drives how fast and
+    /// bright the event camera's trace pulses.
+    var eventUrgency: Double {
+        guard let eventOffset else { return 0 }
+        let distance = abs(currentTime - eventOffset)
+        guard distance < 6 else { return 0 }
+        return 1 - distance / 6
+    }
+
+    /// Snapshots map tiles for the mini map. Cheap to call repeatedly — the
+    /// renderer caches by region, theme, and size.
+    func refreshMapBackdrop(config: HUDConfiguration) async {
+        guard config.mapEnabled else {
+            mapBackdrop = nil
+            return
+        }
+        let route = telemetry.route
+        let fallback = clip.coordinate.map {
+            CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+        }
+        guard let region = MapBackdropRenderer.region(
+            route: route, fallback: fallback, zoomLevel: config.mapZoomLevel
+        ) else {
+            mapBackdrop = nil
+            return
+        }
+        mapBackdrop = await MapBackdropRenderer.backdrop(
+            region: region,
+            theme: config.mapTheme,
+            pixelSize: CGSize(width: 420, height: 260)
+        )
     }
 
     func cycleFocus(forward: Bool) {

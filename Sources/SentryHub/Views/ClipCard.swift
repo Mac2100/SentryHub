@@ -80,6 +80,10 @@ struct ClipCard: View {
                     categoryBadge
                     if let trigger = clip.trigger {
                         triggerBadge(trigger)
+                    } else if let reason = clip.event?.reasonLabel {
+                        // Tesla has shipped reason strings we don't classify. Show
+                        // them anyway rather than dropping the badge silently.
+                        genericEventBadge(reason)
                     }
                     durationChip
                     Spacer()
@@ -153,6 +157,22 @@ struct ClipCard: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Capsule().fill(triggerColor(trigger).opacity(0.85)))
+    }
+
+    private func genericEventBadge(_ reason: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "diamond.fill")
+                .font(.system(size: 8, weight: .semibold))
+            Text(reason.uppercased())
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.8)
+                .lineLimit(1)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(Color(red: 0.34, green: 0.36, blue: 0.42).opacity(0.9)))
+        .help(reason)
     }
 
     private func triggerColor(_ trigger: ClipTrigger) -> Color {

@@ -46,12 +46,60 @@ struct PlayerLayerView: NSViewRepresentable {
     }
 }
 
+/// Traces a highlight around a tile: a segment of stroke travelling the
+/// perimeter plus a breathing glow. Used to point at the camera that saw the
+/// event, which a static border never communicated.
+struct TileTrace: View {
+    let tint: Color
+    /// Speeds up and brightens near the event.
+    var urgency: Double = 0
+
+    @State private var phase: CGFloat = 0
+    @State private var breathe = false
+
+    var body: some View {
+        let period = 3.2 - 1.8 * min(max(urgency, 0), 1)
+        ZStack {
+            Rectangle()
+                .strokeBorder(tint.opacity(0.35 + 0.35 * urgency), lineWidth: 1.5)
+
+            Rectangle()
+                .inset(by: 1)
+                .trim(from: phase, to: phase + 0.16)
+                .stroke(
+                    tint,
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+                )
+                .shadow(color: tint.opacity(0.9), radius: 6)
+
+            Rectangle()
+                .strokeBorder(tint.opacity(breathe ? 0.55 : 0.12), lineWidth: 5)
+                .blur(radius: 6)
+                .animation(
+                    .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
+                    value: breathe
+                )
+        }
+        .allowsHitTesting(false)
+        .onAppear {
+            breathe = true
+            withAnimation(.linear(duration: period).repeatForever(autoreverses: false)) {
+                phase = 1
+            }
+        }
+    }
+}
+
 /// One camera tile: the feed, its label, and the watermark badge — or a
 /// placeholder when the car didn't record that angle.
 struct CameraTile: View {
     let camera: CameraAngle?
     let player: AVPlayer?
     let isFocused: Bool
+    /// The camera the car says triggered the event.
+    let isEventCamera: Bool
+    /// 0…1, rising as the play head approaches the event.
+    let eventUrgency: Double
     let showWatermark: Bool
     let onSelect: () -> Void
 
@@ -100,13 +148,36 @@ struct CameraTile: View {
                 .padding(8)
             }
         }
-        .overlay(
-            Rectangle()
-                .strokeBorder(
-                    isFocused ? Color.accentColor.opacity(0.85) : Color.white.opacity(0.06),
-                    lineWidth: isFocused ? 2 : 1
+        .overlay {
+            if isEventCamera, player != nil {
+                TileTrace(
+                    tint: Color(red: 1.0, green: 0.42, blue: 0.30),
+                    urgency: eventUrgency
                 )
-        )
+            } else {
+                Rectangle()
+                    .strokeBorder(
+                        // A thin tint for the selected tile; the loud highlight
+                        // is reserved for the camera that saw the event.
+                        isFocused ? Color.accentColor.opacity(0.55) : Color.white.opacity(0.06),
+                        lineWidth: isFocused ? 1.5 : 1
+                    )
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if isEventCamera, player != nil {
+                Text("EVENT")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.1)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule().fill(Color(red: 1.0, green: 0.42, blue: 0.30).opacity(0.85))
+                    )
+                    .padding(8)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { onSelect() }
     }
@@ -146,6 +217,9 @@ struct CameraGridView: View {
                         camera: tile.camera,
                         player: tile.camera.flatMap { model.players[$0] },
                         isFocused: tile.camera == model.focusedCamera && model.layout != .single,
+                        isEventCamera: tile.camera != nil
+                            && tile.camera == model.clip.event?.triggerCamera,
+                        eventUrgency: model.eventUrgency,
                         showWatermark: config.watermark
                     ) {
                         if let camera = tile.camera { model.focusedCamera = camera }
@@ -163,6 +237,9 @@ struct CameraGridView: View {
                     route: model.telemetry.route,
                     progress: model.duration > 0 ? model.currentTime / model.duration : 0,
                     availability: model.availability,
+                    mapBackdrop: model.mapBackdrop,
+                    event: model.eventOffset.map { ($0, model.clip.trigger) },
+                    currentTime: model.currentTime,
                     context: .live
                 )
             }
