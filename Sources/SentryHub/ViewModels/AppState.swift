@@ -17,6 +17,17 @@ final class AppState: ObservableObject {
     /// chosen folder loaded so coming back is instant.
     @Published private(set) var isShowingStartScreen = false
 
+    /// Which half of the library is on screen.
+    @Published var libraryTab: LibraryTab = .clips
+
+    enum LibraryTab: String, CaseIterable, Identifiable {
+        case clips, incidents
+
+        var id: String { rawValue }
+        var label: String { self == .clips ? "Clips" : "Incidents" }
+        var symbolName: String { self == .clips ? "square.grid.2x2" : "folder.badge.person.crop" }
+    }
+
     private var cancellables: Set<AnyCancellable> = []
 
     private init() {
@@ -27,6 +38,8 @@ final class AppState: ObservableObject {
         // re-renders when the library loads.
         forward(library.objectWillChange)
         forward(updates.objectWillChange)
+        forward(LocalLibrary.shared.objectWillChange)
+        forward(IncidentStore.shared.objectWillChange)
     }
 
     private func forward(_ publisher: ObservableObjectPublisher) {
@@ -59,8 +72,11 @@ final class AppState: ObservableObject {
         openClip = nil
     }
 
-    /// True once a folder has been picked — before that the welcome screen shows.
-    var hasLibrary: Bool { library.rootURL != nil }
+    /// True once there is something to show — a chosen drive folder, or clips
+    /// saved to this Mac, which are there whether or not the drive is.
+    var hasLibrary: Bool {
+        library.rootURL != nil || !LocalLibrary.shared.clips.isEmpty
+    }
 
     /// The library is shown when a folder is loaded and the user hasn't asked
     /// to go back to the start screen.

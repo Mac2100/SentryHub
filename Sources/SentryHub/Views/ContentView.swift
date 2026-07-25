@@ -118,9 +118,7 @@ struct WelcomeView: View {
             }
             .padding(.top, 36)
 
-            Text(appState.hasLibrary
-                 ? "\(appState.library.clips.count) clips loaded from \(appState.library.rootURL?.lastPathComponent ?? "your folder")."
-                 : "Pick the dashcam drive, its TeslaCam folder, or any folder of clips you copied off it.")
+            Text(librarySummary)
                 .font(.callout)
                 .foregroundStyle(.tertiary)
                 .padding(.top, 10)
@@ -135,6 +133,19 @@ struct WelcomeView: View {
             )
             .ignoresSafeArea()
         )
+    }
+
+    private var librarySummary: String {
+        let library = appState.library
+        guard appState.hasLibrary else {
+            return "Pick the dashcam drive, its TeslaCam folder, or any folder of clips you copied off it."
+        }
+        let saved = library.savedLocallyCount
+        if let root = library.rootURL {
+            let base = "\(library.clips.count) clips loaded from \(root.lastPathComponent)"
+            return saved > 0 ? base + " — \(saved) saved on this Mac." : base + "."
+        }
+        return "\(saved) clip\(saved == 1 ? "" : "s") saved on this Mac. Connect the dashcam drive to add more."
     }
 
     private func featureCard(symbol: String, title: String, detail: String) -> some View {

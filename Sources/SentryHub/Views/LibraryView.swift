@@ -5,18 +5,64 @@ import SwiftUI
 struct LibraryView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var library: LibraryStore
+    @ObservedObject private var incidents = IncidentStore.shared
     @Environment(\.appTheme) private var theme
+
+    @State private var pendingDelete: DeleteRequest?
+    @State private var showRenameSheet = false
+    @State private var showIncidentSheet = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 header
-                controls
-                gallery
+                if appState.libraryTab == .incidents {
+                    IncidentsView(library: library)
+                } else {
+                    controls
+                    if library.isSelecting {
+                        selectionBar
+                    }
+                    gallery
+                }
             }
             .padding(24)
         }
         .background(backdrop)
+        .overlay(alignment: .bottom) { TransferBanner() }
+        .sheet(isPresented: $showRenameSheet) {
+            BulkRenameSheet(count: library.selection.count) { name in
+                library.renameSelection(to: name)
+            }
+        }
+        .sheet(isPresented: $showIncidentSheet) {
+            AddToIncidentSheet(clipIDs: Array(library.selection))
+        }
+        .alert(
+            pendingDelete?.title ?? "",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            presenting: pendingDelete
+        ) { request in
+            Button(request.confirmLabel, role: .destructive) {
+                Task { await request.perform() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { request in
+            Text(request.message)
+        }
+    }
+
+    /// A pending destructive action, held so the alert can describe exactly what
+    /// is about to happen before it happens.
+    struct DeleteRequest: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
+        let confirmLabel: String
+        let perform: () async -> Void
     }
 
     private var backdrop: some View {
@@ -41,11 +87,16 @@ struct LibraryView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Your clip library")
                         .font(.system(size: 30, weight: .bold))
-                    Text("Browse, filter and launch any drive session from a workspace built for fast review.")
+                    Text(headerSubtitle)
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 16)
+
+                CapsuleSegments(
+                    options: AppState.LibraryTab.allCases.map { ($0, $0.label, $0.symbolName) },
+                    selection: $appState.libraryTab
+                )
 
                 Button {
                     appState.showStartScreen()
@@ -80,27 +131,35 @@ struct LibraryView: View {
 
             HStack(alignment: .top, spacing: 14) {
                 statCard(
-                    caption: "CLIPS LOADED",
+                    caption: "CLIPS IN LIBRARY",
                     value: "\(library.clips.count)",
+                    detail: library.driveOnlyCount > 0
+                        ? "\(library.driveOnlyCount) only on the drive"
+                        : (library.clips.isEmpty ? nil : "all saved to this Mac"),
                     symbol: "video.fill",
                     tint: Color(red: 0.16, green: 0.55, blue: 0.98)
                 )
                 statCard(
-                    caption: "GPS TAGGED",
-                    value: "\(library.gpsTaggedCount)",
-                    symbol: "mappin.circle.fill",
+                    caption: "ON THIS MAC",
+                    value: "\(library.savedLocallyCount)",
+                    detail: library.savedLocallyCount > 0
+                        ? Format.bytes(library.locallySavedBytes)
+                        : "nothing saved yet",
+                    symbol: "internaldrive.fill",
                     tint: Color(red: 0.13, green: 0.68, blue: 0.42)
                 )
                 statCard(
-                    caption: "CAMERA STREAMS",
-                    value: "\(library.cameraStreamCount)",
-                    symbol: "camera.fill",
+                    caption: "INCIDENTS",
+                    value: "\(incidents.incidents.count)",
+                    detail: incidents.openCount > 0 ? "\(incidents.openCount) open" : nil,
+                    symbol: "folder.badge.person.crop",
                     tint: Color(red: 0.50, green: 0.34, blue: 0.86)
                 )
                 statCard(
-                    caption: "STORAGE",
+                    caption: "TOTAL SIZE",
                     value: Format.bytes(library.totalBytes),
-                    symbol: "internaldrive.fill",
+                    detail: "\(library.gpsTaggedCount) GPS tagged",
+                    symbol: "externaldrive.fill",
                     tint: Color(red: 0.80, green: 0.60, blue: 0.16)
                 )
                 timelineCard
@@ -108,7 +167,17 @@ struct LibraryView: View {
         }
     }
 
-    private func statCard(caption: String, value: String, symbol: String, tint: Color) -> some View {
+    private var headerSubtitle: String {
+        if library.isRunningWithoutDrive {
+            return "No drive connected — showing the \(library.clips.count) clip"
+                + "\(library.clips.count == 1 ? "" : "s") saved on this Mac."
+        }
+        return "Browse, filter and launch any drive session from a workspace built for fast review."
+    }
+
+    private func statCard(
+        caption: String, value: String, detail: String? = nil, symbol: String, tint: Color
+    ) -> some View {
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(caption)
@@ -116,10 +185,19 @@ struct LibraryView: View {
                     .tracking(1.1)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(value)
-                    .font(.system(size: 27, weight: .bold))
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(value)
+                        .font(.system(size: 27, weight: .bold))
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    if let detail {
+                        Text(detail)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
             }
             Spacer(minLength: 4)
             Image(systemName: symbol)
@@ -203,7 +281,8 @@ struct LibraryView: View {
         if let date = library.timelineDate {
             return date.formatted(date: .long, time: .omitted)
         }
-        return library.rootURL?.lastPathComponent ?? "No folder selected"
+        if let root = library.rootURL { return root.lastPathComponent }
+        return library.clips.isEmpty ? "No folder selected" : "Local library only"
     }
 
     // MARK: - Controls
@@ -221,7 +300,8 @@ struct LibraryView: View {
                     library.triggerFilter = nil
                 }
 
-                ForEach(ClipCategory.allCases) { category in
+                // Folders you or the car chose to keep.
+                ForEach(LibraryStore.leadingCategories) { category in
                     CountChip(
                         label: category.label,
                         symbol: category.symbolName,
@@ -234,22 +314,34 @@ struct LibraryView: View {
                     }
                 }
 
+                Divider().frame(height: 22)
+
+                // Sentry sits on this side of the divider with the reasons it
+                // fired, because that's the folder those clips come from.
+                CountChip(
+                    label: ClipCategory.sentry.label,
+                    symbol: ClipCategory.sentry.symbolName,
+                    count: library.counts[.sentry] ?? 0,
+                    isSelected: library.categoryFilter == .sentry,
+                    tint: theme.primary
+                ) {
+                    library.categoryFilter = .sentry
+                    library.triggerFilter = nil
+                }
+
                 // Why the car kept the clip, from event.json. Only kinds that
                 // actually appear in this library are offered.
-                if !library.availableTriggers.isEmpty {
-                    Divider().frame(height: 22)
-                    ForEach(library.availableTriggers) { trigger in
-                        CountChip(
-                            label: trigger.label,
-                            symbol: trigger.symbolName,
-                            count: library.triggerCount(trigger),
-                            isSelected: library.triggerFilter == trigger,
-                            tint: theme.primary
-                        ) {
-                            library.triggerFilter =
-                                library.triggerFilter == trigger ? nil : trigger
-                            library.categoryFilter = nil
-                        }
+                ForEach(library.availableTriggers) { trigger in
+                    CountChip(
+                        label: trigger.label,
+                        symbol: trigger.symbolName,
+                        count: library.triggerCount(trigger),
+                        isSelected: library.triggerFilter == trigger,
+                        tint: theme.primary
+                    ) {
+                        library.triggerFilter =
+                            library.triggerFilter == trigger ? nil : trigger
+                        library.categoryFilter = nil
                     }
                 }
                 Spacer()
@@ -291,6 +383,49 @@ struct LibraryView: View {
                     selection: $library.presentation
                 )
             }
+
+            HStack(spacing: 12) {
+                // Where the footage lives is a filter in its own right: it's the
+                // difference between a clip you have and one you're about to
+                // lose to the car's rolling buffer.
+                HStack(spacing: 8) {
+                    Text("Storage")
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(0.6)
+                        .foregroundStyle(.tertiary)
+                    CapsuleSegments(
+                        options: StorageFilter.allCases.map { ($0, $0.label, $0.symbolName) },
+                        selection: $library.storageFilter
+                    )
+                }
+
+                if library.driveOnlyCount > 0 {
+                    Text("\(library.driveOnlyCount) clip\(library.driveOnlyCount == 1 ? "" : "s") "
+                         + "will disappear with the drive")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer()
+
+                Button {
+                    if library.isSelecting {
+                        library.endSelecting()
+                    } else {
+                        library.beginSelecting()
+                    }
+                } label: {
+                    Label(
+                        library.isSelecting ? "Done" : "Select",
+                        systemImage: library.isSelecting
+                            ? "xmark.circle" : "checkmark.circle"
+                    )
+                    .font(.system(size: 12, weight: .medium))
+                    .padding(.horizontal, 4)
+                }
+                .buttonStyle(.bordered)
+                .tint(library.isSelecting ? theme.primary : nil)
+            }
         }
         .padding(14)
         .background(
@@ -303,6 +438,145 @@ struct LibraryView: View {
         )
     }
 
+    // MARK: - Selection
+
+    private var selectionBar: some View {
+        let selected = library.selectedClips
+        let toSave = library.selectionToSave
+        let savedLocally = library.selectionSavedLocally
+        let onDrive = library.selectionOnDrive
+        let selectedSize = Format.bytes(selected.reduce(Int64(0)) { $0 + $1.byteCount })
+        let saveSize = Format.bytes(toSave.reduce(Int64(0)) { $0 + $1.byteCount })
+        let saveLabel = toSave.isEmpty ? "Save to Mac" : "Save \(toSave.count) to Mac"
+        let saveHelp = toSave.isEmpty
+            ? "Every selected clip is already on this Mac"
+            : "Copy \(saveSize) into the local library"
+        let isBusy = LocalLibrary.shared.transfer != nil
+
+        return HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(theme.primary)
+            Text("\(selected.count) selected")
+                .font(.system(size: 13, weight: .semibold))
+                .monospacedDigit()
+            if !selected.isEmpty {
+                Text(selectedSize)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            Button("Select All") { library.selectAllVisible() }
+                .buttonStyle(.link)
+                .font(.system(size: 12))
+            if !selected.isEmpty {
+                Button("Clear") { library.selection.removeAll() }
+                    .buttonStyle(.link)
+                    .font(.system(size: 12))
+            }
+
+            Spacer(minLength: 12)
+
+            Button {
+                Task { await library.saveSelectionLocally() }
+            } label: {
+                Label(saveLabel, systemImage: "arrow.down.circle")
+                    .font(.system(size: 12, weight: .medium))
+                    .padding(.horizontal, 3)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(theme.primary)
+            .disabled(toSave.isEmpty || isBusy)
+            .help(saveHelp)
+
+            Button {
+                showIncidentSheet = true
+            } label: {
+                Label("Add to Incident", systemImage: "folder.badge.plus")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .buttonStyle(.bordered)
+            .disabled(selected.isEmpty)
+
+            Button {
+                showRenameSheet = true
+            } label: {
+                Label("Rename", systemImage: "pencil")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .buttonStyle(.bordered)
+            .disabled(selected.isEmpty)
+
+            Menu {
+                Button("Remove \(savedLocally.count) from This Mac", role: .destructive) {
+                    pendingDelete = removeFromMacRequest(savedLocally)
+                }
+                .disabled(savedLocally.isEmpty)
+
+                Button("Delete \(onDrive.count) from the Drive", role: .destructive) {
+                    pendingDelete = deleteFromDriveRequest(onDrive)
+                }
+                .disabled(onDrive.isEmpty)
+            } label: {
+                Label("Delete", systemImage: "trash")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .disabled(selected.isEmpty || isBusy)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(theme.primary.opacity(0.09))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(theme.primary.opacity(0.35), lineWidth: 1)
+        )
+    }
+
+    private func removeFromMacRequest(_ clips: [Clip]) -> DeleteRequest {
+        let orphaned = clips.filter { $0.storage == .local }
+        var message = "The local copies of \(clips.count) clip"
+            + "\(clips.count == 1 ? "" : "s") will be moved to the Trash."
+        if orphaned.isEmpty {
+            message += " They're still on the drive, so you can save them again later."
+        } else {
+            message += " \(orphaned.count) of them "
+                + "\(orphaned.count == 1 ? "is" : "are") no longer on the drive, so this is the "
+                + "only copy."
+        }
+        return DeleteRequest(
+            title: "Remove from this Mac?",
+            message: message,
+            confirmLabel: "Remove"
+        ) {
+            await library.removeSelectionFromMac()
+        }
+    }
+
+    private func deleteFromDriveRequest(_ clips: [Clip]) -> DeleteRequest {
+        let unsaved = clips.filter { LocalLibrary.shared.contains($0.id) == false }
+        var message = "\(clips.count) clip\(clips.count == 1 ? "" : "s") will be deleted from the "
+            + "dashcam drive. Dashcam drives usually have no Trash, so treat this as permanent."
+        if unsaved.isEmpty {
+            message += " Every one of them is saved on this Mac and will stay in your library."
+        } else {
+            message += " \(unsaved.count) of them "
+                + "\(unsaved.count == 1 ? "is" : "are") not saved on this Mac — "
+                + "that footage will be gone."
+        }
+        return DeleteRequest(
+            title: "Delete from the drive?",
+            message: message,
+            confirmLabel: "Delete"
+        ) {
+            await library.deleteSelectionFromDrive()
+        }
+    }
+
     // MARK: - Gallery
 
     private var gallery: some View {
@@ -312,7 +586,7 @@ struct LibraryView: View {
             HStack(spacing: 8) {
                 Text("Showing \(library.filteredClips.count) clip\(library.filteredClips.count == 1 ? "" : "s")")
                     .font(.system(size: 14, weight: .medium))
-                if library.grouping != .none, library.groups.count > 1 {
+                if library.effectiveGrouping != .none, library.groups.count > 1 {
                     Text("in \(library.groups.count) groups")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
@@ -333,10 +607,14 @@ struct LibraryView: View {
                 }
             }
 
-            if let error = library.scanError, library.clips.isEmpty {
+            if library.clips.isEmpty, let error = library.scanError {
                 emptyState(message: error)
             } else if library.filteredClips.isEmpty && !library.isScanning {
-                emptyState(message: "No clips match the current filters.")
+                emptyState(
+                    message: library.storageFilter == .onMac && library.savedLocallyCount == 0
+                        ? "Nothing is saved to this Mac yet. Select clips and choose Save to Mac to keep them once the drive is unplugged."
+                        : "No clips match the current filters."
+                )
             } else if library.presentation == .map {
                 LibraryMapView(clips: library.mappableClips) { clip in
                     appState.open(clip)
@@ -356,7 +634,16 @@ struct LibraryView: View {
                                 spacing: 16
                             ) {
                                 ForEach(group.clips) { clip in
-                                    ClipCard(clip: clip, density: library.density) {
+                                    ClipCard(
+                                        clip: clip,
+                                        density: library.density,
+                                        isSelecting: library.isSelecting,
+                                        isSelected: library.selection.contains(clip.id),
+                                        onToggleSelection: {
+                                            library.beginSelecting()
+                                            library.toggleSelection(clip.id)
+                                        }
+                                    ) {
                                         appState.open(clip)
                                     }
                                 }

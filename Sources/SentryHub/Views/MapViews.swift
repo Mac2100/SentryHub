@@ -24,6 +24,7 @@ struct LibraryMapView: View {
 
     @State private var position: MapCameraPosition = .automatic
     @State private var selected: Clip.ID?
+    @ObservedObject private var labels = ClipLabels.shared
     @Environment(\.appTheme) private var theme
 
     var body: some View {
@@ -32,7 +33,7 @@ struct LibraryMapView: View {
                 ForEach(clips) { clip in
                     if let coordinate = clip.coordinate {
                         Marker(
-                            clip.city ?? clip.name,
+                            clip.city ?? labels.title(for: clip),
                             systemImage: clip.category.symbolName,
                             coordinate: CLLocationCoordinate2D(
                                 latitude: coordinate.latitude, longitude: coordinate.longitude
@@ -84,7 +85,7 @@ struct LibraryMapView: View {
 
     private func selectionCard(_ clip: Clip) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(clip.name)
+            Text(labels.title(for: clip))
                 .font(.system(size: 13, weight: .semibold))
             Text(clip.startDate.briefFormatted)
                 .font(.caption)

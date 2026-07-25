@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 
@@ -89,6 +90,37 @@ struct ClipGroup: Identifiable {
     let clips: [Clip]
 }
 
+/// Which half of the library the gallery is showing.
+enum StorageFilter: String, CaseIterable, Identifiable {
+    case any, onMac, driveOnly
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .any: return "Everywhere"
+        case .onMac: return "On This Mac"
+        case .driveOnly: return "Drive Only"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .any: return "circle.grid.2x2"
+        case .onMac: return "internaldrive.fill"
+        case .driveOnly: return "externaldrive"
+        }
+    }
+
+    func accepts(_ clip: Clip) -> Bool {
+        switch self {
+        case .any: return true
+        case .onMac: return clip.storage.isSavedLocally
+        case .driveOnly: return clip.storage == .device
+        }
+    }
+}
+
 /// Presets for the library's date filter.
 enum DateRangePreset: String, CaseIterable, Identifiable {
     case any, today, week, month, custom
@@ -116,10 +148,19 @@ enum DateRangePreset: String, CaseIterable, Identifiable {
     }
 }
 
-/// Owns the scanned clip library plus the gallery's filter/sort state.
+/// Owns the clip library plus the gallery's filter/sort/selection state.
+///
+/// Two sources feed it: the dashcam drive, and SentryHub's own local library.
+/// They are merged into one list of cards so the library reads as a library
+/// rather than as a view onto whatever happens to be plugged in.
 @MainActor
 final class LibraryStore: ObservableObject {
+    /// The merged view — what every screen reads.
     @Published private(set) var clips: [Clip] = []
+    /// What the drive scan found, kept separately because deleting from the
+    /// drive and copying off it both need the drive's own paths, which the
+    /// merge replaces with the local copy's whenever there is one.
+    @Published private(set) var deviceClips: [Clip] = []
     @Published private(set) var rootURL: URL?
     @Published private(set) var resolvedRoot: URL?
     @Published private(set) var isScanning = false
@@ -129,6 +170,7 @@ final class LibraryStore: ObservableObject {
     @Published var categoryFilter: ClipCategory?
     @Published var triggerFilter: ClipTrigger?
     @Published var searchText: String = ""
+    @Published var storageFilter: StorageFilter = .any
     @Published var sortOrder: LibrarySortOrder = .date
     @Published var presentation: LibraryPresentation = .grid
     @Published var density: GalleryDensity = .regular
@@ -141,9 +183,34 @@ final class LibraryStore: ObservableObject {
     ) ?? Date()
     @Published var customEnd: Date = Date()
 
+    // Multi-select
+    @Published var isSelecting = false
+    @Published var selection: Set<Clip.ID> = []
+
     private var durationTask: Task<Void, Never>?
+    private var cancellables: Set<AnyCancellable> = []
 
     init() {
+        // Renaming a clip changes what search matches on, and SwiftUI only
+        // watches the object a view declared — so pass the label store's
+        // notifications on as our own.
+        ClipLabels.shared.objectWillChange.sink { [weak self] _ in
+            // ClipLabels is @MainActor, so this always arrives on the main actor.
+            MainActor.assumeIsolated {
+                self?.objectWillChange.send()
+            }
+        }
+        .store(in: &cancellables)
+
+        // The local library is the other half of the merge, and it changes
+        // whenever clips are saved or removed.
+        LocalLibrary.shared.clipsDidChange.sink { [weak self] latest in
+            // LocalLibrary is @MainActor, so this always arrives on the main actor.
+            MainActor.assumeIsolated {
+                self?.rebuild(local: latest)
+            }
+        }
+        .store(in: &cancellables)
         if let stored = UserDefaults.standard.string(forKey: "galleryDensity"),
            let value = GalleryDensity(rawValue: stored) {
             density = value
@@ -184,7 +251,8 @@ final class LibraryStore: ObservableObject {
             }.value
         } catch {
             scanError = error.localizedDescription
-            clips = []
+            deviceClips = []
+            rebuild()
             isScanning = false
             return
         }
@@ -194,24 +262,57 @@ final class LibraryStore: ObservableObject {
             return
         }
 
-        clips = result.clips
+        deviceClips = result.clips
         resolvedRoot = result.resolvedRoot
+        rebuild()
         isScanning = false
 
         if let warning = result.warnings.first {
             ToastCenter.shared.show("Scan finished with notes", detail: warning, style: .info)
         }
-        if clips.isEmpty && scanError == nil {
+        if deviceClips.isEmpty && scanError == nil {
             scanError = "No TeslaCam clips found in \(root.lastPathComponent)."
         }
 
         resolveDurationsInBackground()
     }
 
+    // MARK: - Merging the drive and the local library
+
+    /// Rebuilds the merged list. One card per clip, wherever it lives.
+    func rebuild(local: [Clip]? = nil) {
+        clips = Self.merge(device: deviceClips, local: local ?? LocalLibrary.shared.clips)
+    }
+
+    static func merge(device: [Clip], local: [Clip]) -> [Clip] {
+        var byID: [Clip.ID: Clip] = [:]
+        byID.reserveCapacity(device.count + local.count)
+
+        for clip in device {
+            var copy = clip
+            copy.storage = .device
+            byID[clip.id] = copy
+        }
+        for clip in local {
+            var copy = clip
+            // The local copy takes over playback where both exist: it keeps
+            // working once the drive is unplugged, and reads faster than USB.
+            copy.storage = byID[clip.id] == nil ? .local : .both
+            byID[clip.id] = copy
+        }
+        return byID.values.sorted { $0.startDate > $1.startDate }
+    }
+
+    /// The drive's own copy of a clip — the one holding the paths to read from
+    /// when saving, and the ones to delete when clearing the drive.
+    func driveCopy(of id: Clip.ID) -> Clip? {
+        deviceClips.first { $0.id == id }
+    }
+
     /// Replaces the assumed 60 s segment length with the real durations, then
     /// republishes so the gallery's badges settle on the correct values.
     private func resolveDurationsInBackground() {
-        let snapshot = clips
+        let snapshot = deviceClips
         durationTask = Task { [weak self] in
             var updated: [Clip] = []
             updated.reserveCapacity(snapshot.count)
@@ -221,8 +322,9 @@ final class LibraryStore: ObservableObject {
             }
             if Task.isCancelled { return }
             await MainActor.run { [weak self] in
-                guard let self, self.clips.count == updated.count else { return }
-                self.clips = updated
+                guard let self, self.deviceClips.count == updated.count else { return }
+                self.deviceClips = updated
+                self.rebuild()
             }
         }
     }
@@ -231,7 +333,8 @@ final class LibraryStore: ObservableObject {
         FolderAccess.forget()
         rootURL = nil
         resolvedRoot = nil
-        clips = []
+        deviceClips = []
+        rebuild()
         scanError = nil
     }
 
@@ -245,11 +348,20 @@ final class LibraryStore: ObservableObject {
         return result
     }
 
-    /// Trigger kinds actually present, so no empty pills are offered.
+    /// Trigger kinds actually present, so no empty pills are offered. Ordered
+    /// most-common-first rather than by declaration order.
     var availableTriggers: [ClipTrigger] {
         let present = Set(clips.compactMap(\.trigger))
-        return ClipTrigger.allCases.filter { present.contains($0) }
+        return Self.triggerDisplayOrder.filter { present.contains($0) }
     }
+
+    private static let triggerDisplayOrder: [ClipTrigger] = [
+        .motion, .honk, .impact, .manualSave
+    ]
+
+    /// Folder chips shown ahead of the divider. Sentry sits with the event
+    /// kinds on the other side, because that's where its clips come from.
+    static let leadingCategories: [ClipCategory] = [.recent, .saved]
 
     func triggerCount(_ trigger: ClipTrigger) -> Int {
         clips.filter { $0.trigger == trigger }.count
@@ -325,10 +437,24 @@ final class LibraryStore: ObservableObject {
             result = result.filter { interval.contains($0.startDate) }
         }
 
+        if storageFilter != .any {
+            result = result.filter { storageFilter.accepts($0) }
+        }
+
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if !query.isEmpty {
             result = result.filter { clip in
                 if clip.name.lowercased().contains(query) { return true }
+                if let label = ClipLabels.shared.label(for: clip)?.lowercased(),
+                   label.contains(query) { return true }
+                // "saved", "mac", "drive" are things people type when they mean
+                // where the footage is, so let them work as search terms.
+                if clip.storage.shortLabel.lowercased().contains(query) { return true }
+                for incident in IncidentStore.shared.incidents(containing: clip.id) {
+                    if incident.title.lowercased().contains(query) { return true }
+                    if !incident.reference.isEmpty,
+                       incident.reference.lowercased().contains(query) { return true }
+                }
                 if let city = clip.city?.lowercased(), city.contains(query) { return true }
                 if let reason = clip.event?.reasonLabel?.lowercased(), reason.contains(query) {
                     return true
@@ -380,11 +506,144 @@ final class LibraryStore: ObservableObject {
         triggerFilter = nil
         searchText = ""
         datePreset = .any
+        storageFilter = .any
     }
 
     var hasActiveFilters: Bool {
         categoryFilter != nil || triggerFilter != nil || isDateFiltered
+            || storageFilter != .any
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    // MARK: - Storage
+
+    var savedLocallyCount: Int {
+        clips.filter { $0.storage.isSavedLocally }.count
+    }
+
+    var driveOnlyCount: Int {
+        clips.filter { $0.storage == .device }.count
+    }
+
+    var locallySavedBytes: Int64 {
+        clips.filter { $0.storage.isSavedLocally }.reduce(0) { $0 + $1.byteCount }
+    }
+
+    /// True when nothing is plugged in but the local library still has footage —
+    /// the case the whole feature exists for.
+    var isRunningWithoutDrive: Bool {
+        deviceClips.isEmpty && !clips.isEmpty
+    }
+
+    // MARK: - Selection
+
+    func toggleSelection(_ id: Clip.ID) {
+        if selection.contains(id) {
+            selection.remove(id)
+        } else {
+            selection.insert(id)
+        }
+    }
+
+    func beginSelecting(with id: Clip.ID? = nil) {
+        isSelecting = true
+        if let id { selection.insert(id) }
+    }
+
+    func endSelecting() {
+        isSelecting = false
+        selection.removeAll()
+    }
+
+    func selectAllVisible() {
+        selection.formUnion(filteredClips.map(\.id))
+    }
+
+    /// Everything selected, whether or not the current filters still show it —
+    /// changing a filter shouldn't quietly drop clips out of a pending action.
+    var selectedClips: [Clip] {
+        clips.filter { selection.contains($0.id) }
+    }
+
+    /// Selected clips that aren't on this Mac yet, as their *drive* copies.
+    var selectionToSave: [Clip] {
+        selectedClips
+            .filter { !$0.storage.isSavedLocally }
+            .compactMap { driveCopy(of: $0.id) }
+    }
+
+    var selectionSavedLocally: [Clip] {
+        selectedClips.filter { $0.storage.isSavedLocally }
+    }
+
+    var selectionOnDrive: [Clip] {
+        selectedClips.compactMap { driveCopy(of: $0.id) }
+    }
+
+    // MARK: - Selection actions
+
+    func saveSelectionLocally() async {
+        let targets = selectionToSave
+        guard !targets.isEmpty else {
+            ToastCenter.shared.show("Already saved", detail: "Every selected clip is on this Mac.", style: .info)
+            return
+        }
+        await LocalLibrary.shared.save(targets)
+    }
+
+    func removeSelectionFromMac() async {
+        await LocalLibrary.shared.remove(selectionSavedLocally.map(\.id))
+    }
+
+    /// Deletes the drive's copies. Anything saved locally survives — that's the
+    /// point of the pairing, and it's what makes clearing the drive safe.
+    func deleteSelectionFromDrive() async {
+        let targets = selectionOnDrive
+        guard !targets.isEmpty else { return }
+
+        let urls = targets.flatMap(\.storedItems)
+        let failure = await Task.detached(priority: .utility) {
+            ClipFiles.trash(urls)
+        }.value
+
+        let ids = Set(targets.map(\.id))
+        deviceClips.removeAll { ids.contains($0.id) }
+        rebuild()
+        // Clips that had a local copy are still here; the rest are gone.
+        selection.formIntersection(Set(clips.map(\.id)))
+
+        if let failure {
+            ToastCenter.shared.show(
+                "Couldn't delete every clip", detail: failure, style: .error
+            )
+        } else {
+            ToastCenter.shared.show(
+                "Deleted \(targets.count) clip\(targets.count == 1 ? "" : "s") from the drive",
+                detail: "Local copies are untouched.",
+                style: .info
+            )
+        }
+    }
+
+    /// Names the selection. One clip takes the name as-is; several get numbered,
+    /// in the order the gallery is showing them.
+    func renameSelection(to base: String) {
+        let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ordered = filteredClips.filter { selection.contains($0.id) }
+        let targets = ordered.isEmpty ? selectedClips : ordered
+        guard !targets.isEmpty else { return }
+
+        if trimmed.isEmpty {
+            for clip in targets { ClipLabels.shared.set(nil, for: clip) }
+            return
+        }
+        if targets.count == 1 {
+            ClipLabels.shared.set(trimmed, for: targets[0])
+            return
+        }
+        for (index, clip) in targets.enumerated() {
+            ClipLabels.shared.set("\(trimmed) \(index + 1)", for: clip)
+        }
     }
 
     func persistDensity() {
@@ -397,17 +656,28 @@ final class LibraryStore: ObservableObject {
 
     // MARK: - Grouping
 
+    /// Day sections only make sense while the list is in date order — sorting
+    /// by size or length inside per-day buckets looks like the sort did
+    /// nothing. Any other sort collapses the gallery to one section so the
+    /// ordering is global and visible.
+    var effectiveGrouping: ClipGrouping {
+        sortOrder == .date ? grouping : .none
+    }
+
     /// The filtered clips broken into sections. A drive's worth of Sentry
     /// events is hundreds of cards; sections make that scannable.
     var groups: [ClipGroup] {
         let clips = filteredClips
         guard !clips.isEmpty else { return [] }
 
-        switch grouping {
+        switch effectiveGrouping {
         case .none:
             return [ClipGroup(
-                id: "all", title: "All Clips", subtitle: nil,
-                symbolName: "square.grid.2x2", clips: clips
+                id: "all",
+                title: sortOrder == .date ? "All Clips" : "Sorted by \(sortOrder.label)",
+                subtitle: Self.groupSubtitle(clips),
+                symbolName: sortOrder == .date ? "square.grid.2x2" : "arrow.up.arrow.down",
+                clips: clips
             )]
 
         case .day:
@@ -422,7 +692,7 @@ final class LibraryStore: ObservableObject {
                     title: Self.dayTitle(day, calendar: calendar),
                     subtitle: Self.groupSubtitle(items),
                     symbolName: "calendar",
-                    clips: items.sorted { $0.startDate > $1.startDate }
+                    clips: items
                 )
             }
 
@@ -436,7 +706,7 @@ final class LibraryStore: ObservableObject {
                     title: trigger?.label ?? "No Event Recorded",
                     subtitle: Self.groupSubtitle(items),
                     symbolName: trigger?.symbolName ?? "questionmark.circle",
-                    clips: items.sorted { $0.startDate > $1.startDate }
+                    clips: items
                 )
             }
 
@@ -449,7 +719,7 @@ final class LibraryStore: ObservableObject {
                     title: category.label,
                     subtitle: Self.groupSubtitle(items),
                     symbolName: category.symbolName,
-                    clips: items.sorted { $0.startDate > $1.startDate }
+                    clips: items
                 )
             }
         }
