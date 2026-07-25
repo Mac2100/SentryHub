@@ -235,6 +235,9 @@ final class LibraryStore: ObservableObject {
 
     func load(root: URL) async {
         rootURL = root
+        // Every route into a folder goes through here — the picker, the restore,
+        // and a drive being plugged in — so this is where it gets remembered.
+        FolderAccess.remember(root)
         await rescan()
     }
 
@@ -329,6 +332,21 @@ final class LibraryStore: ObservableObject {
         }
     }
 
+    /// The drive was pulled out. Its clips go with it; the ones saved to this
+    /// Mac stay, which is the entire point of having saved them.
+    ///
+    /// The folder bookmark is deliberately kept, so plugging the drive back in
+    /// picks up where this left off.
+    func driveWasRemoved() {
+        rootURL = nil
+        resolvedRoot = nil
+        deviceClips = []
+        scanError = nil
+        durationTask?.cancel()
+        rebuild()
+        selection.formIntersection(Set(clips.map(\.id)))
+    }
+
     func forgetFolder() {
         FolderAccess.forget()
         rootURL = nil
@@ -361,7 +379,11 @@ final class LibraryStore: ObservableObject {
 
     /// Folder chips shown ahead of the divider. Sentry sits with the event
     /// kinds on the other side, because that's where its clips come from.
-    static let leadingCategories: [ClipCategory] = [.recent, .saved]
+    ///
+    /// Recent isn't offered: it's the car's rolling buffer rather than something
+    /// kept on purpose, so it's not a category you'd filter down to. Those clips
+    /// still appear under All.
+    static let leadingCategories: [ClipCategory] = [.saved]
 
     func triggerCount(_ trigger: ClipTrigger) -> Int {
         clips.filter { $0.trigger == trigger }.count

@@ -31,7 +31,7 @@ and exports a range to MP4 with the HUD burned in.
   they'll destroy first — including the fact that dashcam drives have no Trash, so deleting off one
   is permanent.
 - **Clip library** — the app opens straight into the gallery: clips loaded, GPS-tagged, camera
-  streams, and total storage at a glance. Filter chips for **All / Sentry / Saved / Recent** plus
+  streams, and total storage at a glance. Filter chips for **All / Saved / Sentry** plus
   trigger chips derived from `event.json` (**Motion / Impact / Honk / Saved by You**, offered only
   when clips of that kind exist), a date filter with presets and a custom range picker, search,
   sorting by date/category/length/size/name, three card densities, and a **Grid / Map** switch that pins
@@ -117,8 +117,13 @@ For development, `swift run` works directly, or open `Package.swift` in Xcode.
 
 ## Using it
 
-Plug in the dashcam drive and choose it with **Choose Your TeslaCam Folder** (⌘O). SentryHub
-accepts the drive root, the `TeslaCam` folder itself, or any folder of clips you copied off it:
+**Plug the drive in and SentryHub opens it.** Mounted volumes are watched, and a drive holding a
+`TeslaCam` folder is loaded straight into the library — at launch or the moment it appears. If a
+different folder is already open the library is left alone and you're told the drive is there
+instead. Pull the drive out and its clips leave with it, while anything saved to this Mac stays.
+
+You can still pick a folder by hand with **Choose Your TeslaCam Folder** (⌘O). SentryHub accepts
+the drive root, the `TeslaCam` folder itself, or any folder of clips you copied off it:
 
 ```
 <drive>/

@@ -23,6 +23,9 @@ struct SentryHubApp: App {
                     // and it's what the app has to show when no drive is.
                     await LocalLibrary.shared.rescan()
                     await appState.library.restoreLastFolder()
+                    // After the restore, so a drive that's already plugged in
+                    // only gets adopted when nothing came back from last time.
+                    appState.startWatchingDrives()
                 }
         }
         .commands {
