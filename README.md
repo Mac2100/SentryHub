@@ -26,7 +26,8 @@ and exports a range to MP4 with the HUD burned in.
   safely on your Mac, and offers to save the rest — because "the clips from the 3rd" is no use if
   they were left on a drive the car has since overwritten.
 - **Multi-select** — a checkbox appears in a card's corner as you hover it, and once anything is
-  ticked it shows on every card at once. Ticking one opens the action bar: save a batch to the Mac,
+  ticked it shows on every card at once. Ticking one opens an action bar that floats at the bottom of
+  the window and stays there while you scroll: save a batch to the Mac,
   file it
   into an incident, rename it in one go (one clip takes the name as typed; several get numbered),
   remove local copies, or clear clips off the drive. Both destructive actions state exactly what

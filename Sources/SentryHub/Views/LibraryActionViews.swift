@@ -29,7 +29,6 @@ struct TransferBanner: View {
             .background(.regularMaterial, in: Capsule())
             .overlay(Capsule().strokeBorder(theme.primary.opacity(0.3), lineWidth: 1))
             .shadow(color: .black.opacity(0.18), radius: 14, y: 5)
-            .padding(.bottom, 24)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
