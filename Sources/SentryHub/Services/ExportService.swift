@@ -557,9 +557,14 @@ final class ExportService: ObservableObject {
 
         /// Composites one HUD frame onto a decoded video frame.
         ///
-        /// A `CGContext` over a `CVPixelBuffer` treats row 0 as the *bottom* of
-        /// its coordinate space while the buffer stores it as the top row, so
-        /// the context is flipped before drawing.
+        /// Deliberately no flip. A Core Graphics bitmap context stores row 0 as
+        /// the *top* of the image and puts its logical origin at the bottom
+        /// left; `CVPixelBuffer` is laid out the same way. The two already
+        /// agree, so `draw(_:in:)` lands the overlay the right way up.
+        ///
+        /// This used to translate and scale by -1 on the strength of the
+        /// opposite belief, which turned every exported HUD upside down — the
+        /// clock at the bottom, the map at the top, and all the text mirrored.
         private static func draw(_ hud: CGImage, into pixelBuffer: CVPixelBuffer) {
             CVPixelBufferLockBaseAddress(pixelBuffer, [])
             defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
@@ -578,8 +583,6 @@ final class ExportService: ObservableObject {
                         | CGBitmapInfo.byteOrder32Little.rawValue
                   ) else { return }
 
-            context.translateBy(x: 0, y: CGFloat(height))
-            context.scaleBy(x: 1, y: -1)
             context.draw(
                 hud,
                 in: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height))
@@ -669,11 +672,9 @@ final class ExportService: ObservableObject {
             renderer.scale = 1
             renderer.isOpaque = false
             if let overlay = renderer.cgImage {
-                context.saveGState()
-                context.translateBy(x: 0, y: renderSize.height)
-                context.scaleBy(x: 1, y: -1)
+                // Upright, for the same reason as the video path: the bitmap
+                // context and the overlay already agree on which row is the top.
                 context.draw(overlay, in: CGRect(origin: .zero, size: renderSize))
-                context.restoreGState()
             }
         }
 

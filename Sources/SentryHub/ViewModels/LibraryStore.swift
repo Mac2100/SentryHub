@@ -512,7 +512,29 @@ final class LibraryStore: ObservableObject {
     }
 
     private func triggerChips(for origin: ClipCategory) -> [LibraryChip] {
-        availableTriggers.filter { $0.origin == origin }.map { LibraryChip.trigger($0) }
+        let triggers = availableTriggers.filter { $0.origin == origin }
+
+        // One reason that accounts for the whole folder is the folder said
+        // twice: Sentry 1 / Motion 1 picks the same clip either way. Drop the
+        // reason and keep the folder, which is the one that stays meaningful
+        // when a second kind of event turns up.
+        if triggers.count == 1 {
+            let inFolder = clips.filter { $0.category == origin }
+            if !inFolder.isEmpty, inFolder.allSatisfy({ $0.trigger == triggers[0] }) {
+                return []
+            }
+        }
+        return triggers.map { LibraryChip.trigger($0) }
+    }
+
+    /// Folder chips say what's in them when their reason chip has been folded
+    /// away, so hiding it costs no information.
+    func help(for chip: LibraryChip) -> String {
+        guard case .category(let category) = chip else { return chip.help }
+        let inFolder = clips.filter { $0.category == category }
+        guard let first = inFolder.first?.trigger,
+              inFolder.allSatisfy({ $0.trigger == first }) else { return chip.help }
+        return chip.help + " — every one of them is \(first.label.lowercased())"
     }
 
     var selectedChip: LibraryChip {
