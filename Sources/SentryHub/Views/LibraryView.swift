@@ -20,16 +20,30 @@ struct LibraryView: View {
                     IncidentsView(library: library)
                 } else {
                     controls
-                    if library.isSelecting {
-                        selectionBar
-                    }
                     gallery
                 }
             }
             .padding(24)
+            // Room for the floating bar, so the last row of cards can still be
+            // scrolled clear of it.
+            .padding(.bottom, library.isSelecting ? 76 : 0)
         }
         .background(backdrop)
-        .overlay(alignment: .bottom) { TransferBanner() }
+        // The selection bar floats over the window rather than sitting in the
+        // scroll content. Finding the clip you want is the part that takes
+        // scrolling; having to scroll back to the top to act on it undoes that.
+        .overlay(alignment: .bottom) {
+            VStack(spacing: 10) {
+                TransferBanner()
+                if library.isSelecting {
+                    selectionBar
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 18)
+            .animation(.snappy(duration: 0.22), value: library.isSelecting)
+        }
         .overlayPreferenceValue(TourAnchorKey.self) { anchors in
             TourOverlay(anchors: anchors)
         }
@@ -508,14 +522,18 @@ struct LibraryView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+        // Material rather than a tint: it's over the gallery now, and a
+        // translucent wash would leave the labels sitting on top of thumbnails.
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(theme.primary.opacity(0.09))
+                .fill(theme.primary.opacity(0.12))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(theme.primary.opacity(0.35), lineWidth: 1)
+                .strokeBorder(theme.primary.opacity(0.4), lineWidth: 1)
         )
+        .shadow(color: .black.opacity(0.28), radius: 16, y: 6)
     }
 
     private func removeFromMacRequest(_ clips: [Clip]) -> DeleteRequest {
