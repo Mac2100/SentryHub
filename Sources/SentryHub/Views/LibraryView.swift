@@ -303,7 +303,7 @@ struct LibraryView: View {
         ) {
             library.select(chip)
         }
-        .help(chip.help)
+        .help(library.help(for: chip))
     }
 
     private var controls: some View {
