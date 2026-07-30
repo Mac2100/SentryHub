@@ -33,6 +33,8 @@ struct SentryHubApp: App {
                 Button("Check for Updates…") {
                     Task { await appState.updates.check(userInitiated: true) }
                 }
+                Link("Star on GitHub…", destination: SupportLinks.gitHubRepo)
+                Link("Buy Me a Coffee…", destination: SupportLinks.buyMeACoffee)
             }
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .toolbar) {
