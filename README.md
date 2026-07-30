@@ -297,6 +297,12 @@ Pushing a `v*` tag by hand, or dispatching **Build** manually with *release* che
 - The only outbound request is the optional update check against the public GitHub Releases API,
   switchable off in **Settings → Updates**.
 
+## Support
+
+SentryHub is free and open source. If it saves you time digging through TeslaCam clips, you can say thanks with a coffee:
+
+<a href="https://www.buymeacoffee.com/Mac2100" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
 ## License
 
 [MIT](LICENSE)

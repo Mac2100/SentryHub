@@ -416,6 +416,8 @@ struct AboutSettingsView: View {
                 )
             }
             .padding(.top, 6)
+            BuyMeACoffeeButton()
+                .padding(.top, 10)
             Text("Not affiliated with, endorsed by, or sponsored by Tesla, Inc.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
