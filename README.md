@@ -1,5 +1,7 @@
 # SentryHub
 
+[![Star on GitHub](https://img.shields.io/github/stars/Mac2100/SentryHub?style=flat&logo=github&label=Star)](https://github.com/Mac2100/SentryHub)
+
 An open-source, native **macOS** library and viewer for Tesla dashcam footage, built with SwiftUI.
 
 SentryHub reads a TeslaCam drive entirely on your Mac: it organises Sentry, Saved, and Recent
@@ -299,7 +301,9 @@ Pushing a `v*` tag by hand, or dispatching **Build** manually with *release* che
 
 ## Support
 
-SentryHub is free and open source. If it saves you time digging through TeslaCam clips, you can say thanks with a coffee:
+SentryHub is free and open source. If it saves you time digging through TeslaCam clips, the easiest way to help is a
+**[star on GitHub](https://github.com/Mac2100/SentryHub)** — it costs nothing and helps other people
+find the app. If you'd rather say thanks with a coffee:
 
 <a href="https://www.buymeacoffee.com/Mac2100" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
